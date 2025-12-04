@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import time
 import typing as tp
 from pathlib import Path
 
@@ -97,9 +98,19 @@ class JobPaths:
         self, tmp_path: tp.Union[Path, str], name: str, keep_as_symlink: bool = False
     ) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
-        Path(tmp_path).rename(getattr(self, name))
+        target = getattr(self, name)
+        tmp_path_obj = Path(tmp_path)
+        # On Windows, rename fails if target exists, so remove it first
+        if target.exists():
+            target.unlink()
+        tmp_path_obj.rename(target)
         if keep_as_symlink:
-            Path(tmp_path).symlink_to(getattr(self, name))
+            try:
+                tmp_path_obj.symlink_to(target)
+            except (OSError, NotImplementedError):
+                # Windows may not have symlink permission or it may not be available
+                # Just skip symlink creation in this case
+                pass
 
     @staticmethod
     def get_first_id_independent_folder(folder: tp.Union[Path, str]) -> Path:
@@ -260,25 +271,58 @@ def copy_process_streams(
         p_stderr.fileno(): (p_stderr, stderr, sys.stderr),
     }
     fds = list(stream_by_fd.keys())
-    poller = select.poll()
-    for fd in stream_by_fd:
-        poller.register(fd, select.POLLIN | select.POLLPRI)
-    while fds:
-        # `poll` syscall will wait until one of the registered file descriptors has content.
-        ready = poller.poll()
-        for fd, _ in ready:
-            p_stream, string, std = stream_by_fd[fd]
-            raw_buf = p_stream.read(2**16)
-            if not raw_buf:
-                fds.remove(fd)
-                poller.unregister(fd)
-                continue
-            buf = raw_buf.decode()
-            string.write(buf)
-            string.flush()
-            if verbose:
-                std.write(buf)
-                std.flush()
+    
+    # Windows doesn't support select.poll() on file descriptors, use select.select() instead
+    if hasattr(select, 'poll'):
+        poller = select.poll()
+        for fd in stream_by_fd:
+            poller.register(fd, select.POLLIN | select.POLLPRI)
+        while fds:
+            # `poll` syscall will wait until one of the registered file descriptors has content.
+            ready = poller.poll()
+            for fd, _ in ready:
+                p_stream, string, std = stream_by_fd[fd]
+                raw_buf = p_stream.read(2**16)
+                if not raw_buf:
+                    fds.remove(fd)
+                    poller.unregister(fd)
+                    continue
+                buf = raw_buf.decode()
+                string.write(buf)
+                string.flush()
+                if verbose:
+                    std.write(buf)
+                    std.flush()
+    else:
+        # Fallback for Windows: use select.select() which works with socket-like objects
+        while fds:
+            try:
+                ready, _, _ = select.select(list(stream_by_fd.keys()), [], [], 0.1)
+            except (OSError, ValueError):
+                # select.select on Windows only works with sockets, not regular file descriptors
+                # Fall back to non-blocking reads
+                ready = fds
+            
+            for fd in ready:
+                p_stream, string, std = stream_by_fd[fd]
+                try:
+                    raw_buf = p_stream.read(2**16)
+                    if not raw_buf:
+                        fds.remove(fd)
+                        continue
+                    buf = raw_buf.decode()
+                    string.write(buf)
+                    string.flush()
+                    if verbose:
+                        std.write(buf)
+                        std.flush()
+                except (OSError, BlockingIOError):
+                    # No data available
+                    pass
+            
+            # Prevent busy waiting
+            if not ready:
+                time.sleep(0.01)
 
 
 # used in "_core", so cannot be in "helpers"

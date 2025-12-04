@@ -135,6 +135,11 @@ class JobEnvironment:
 
     @classmethod
     def _usr_sig(cls) -> tp.Any:
+        import sys
+        # On Windows, many signals are not available
+        if sys.platform == "win32":
+            return signal.SIGTERM  # Use SIGTERM as fallback
+        
         name = "SIG" + cls.USR_SIG
         out = getattr(signal, name, None)
         if out is None:
@@ -149,6 +154,11 @@ class JobEnvironment:
         The default implementation checkpoint the given submission and requeues it.
         @plugin-dev: Should be adapted to the signals used in this cluster.
         """
+        import sys
+        # Signal handling is limited on Windows, skip it
+        if sys.platform == "win32":
+            return
+        
         handler = SignalHandler(self, paths, submission)
         signal.signal(self._usr_sig(), handler.checkpoint_and_try_requeue)
         # A priori we don't need other signals anymore,

@@ -98,7 +98,7 @@ print("printed {n} lines to stderr")
     j1 = executor.submit(fn1)
     assert "10 lines" in j1.result()
 
-    fn2 = utils.CommandFunction(["python", "-c", code.format(n=1000)])
+    fn2 = utils.CommandFunction([sys.executable, "-c", code.format(n=1000)])
     j2 = executor.submit(fn2)
     assert "1000 lines" in j2.result()
 

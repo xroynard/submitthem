@@ -327,7 +327,12 @@ class Controller:
 
     def kill_tasks(self) -> None:
         # try and be progressive in deletion...
-        for sig in [signal.SIGINT, signal.SIGKILL]:
+        signals = [signal.SIGINT]
+        # SIGKILL is not available on Windows
+        if hasattr(signal, "SIGKILL"):
+            signals.append(signal.SIGKILL)
+        
+        for sig in signals:
             self._forward_signal(sig)
             # if one is still alive after sigterm and sigint, try sigkill after 1s
             if sig == signal.SIGINT and any(t.poll() is None for t in self.tasks):
@@ -338,7 +343,14 @@ class Controller:
         files = self.stdouts + self.stderrs
         self.stdouts, self.stderrs = [], []  # remove all instance references
         for f in files:
-            f.close()
+            try:
+                f.flush()  # Ensure all data is written before closing
+            except (OSError, ValueError):
+                pass  # File might already be closed or invalid
+            try:
+                f.close()
+            except (OSError, ValueError):
+                pass  # File might already be closed
 
     def wait(self, freq: int = 24) -> tp.Sequence[tp.Optional[int]]:
         """Waits for all tasks to finish or to time-out.
