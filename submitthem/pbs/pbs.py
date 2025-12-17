@@ -442,7 +442,7 @@ class PBSJob(core.Job[core.R]):
         base_folder = self._paths._folder
         return utils.JobPaths(folder=base_folder, job_id=main_job_id, task_id=self.task_id)
 
-    def _interrupt(self, timeout: bool = False) -> None:
+    def _interrupt(self, timeout: bool = False) -> None:  # pylint: disable=unused-argument
         """Cancels the job using PBS qdel.
 
         Parameter
@@ -833,9 +833,7 @@ class PBSExecutor(core.PicklingExecutor):
         we submit without output redirection and use qalter to set the output files
         with the actual job ID.
         """
-        import uuid as uuid_module
-
-        tmp_uuid = uuid_module.uuid4().hex
+        tmp_uuid = uuid.uuid4().hex
         submission_file_path = (
             utils.JobPaths.get_first_id_independent_folder(self.folder) / f".submission_file_{tmp_uuid}.sh"
         )
@@ -1134,7 +1132,8 @@ def _make_qsub_string(
     if setup is not None:
         lines += ["", "# setup"] + setup
     # commandline (this will run the function and args specified in the file provided as argument)
-    # We pass -o and -e here, (TODO: check this statement for PBS: because the qsub command doesn't work as expected with a filename pattern)
+    # We pass -o and -e here, (TODO: check this statement for PBS: because the qsub
+    # command doesn't work as expected with a filename pattern)
 
     lines += [
         "",
@@ -1174,12 +1173,8 @@ def _as_qsub_flag(key: str, value: tp.Any) -> str:
         "walltime": "l walltime",
     }
 
-    # Map the key if it's in our special map
-    if key in pbs_flag_map:
-        key = pbs_flag_map[key]
-    else:
-        # Replace underscores with hyphens for other keys
-        key = key.replace("_", "-")
+    # Map the key if it's in our special map, otherwise replace underscores with hyphens
+    key = pbs_flag_map.get(key, key.replace("_", "-"))
 
     # Handle boolean flags
     if value is True:

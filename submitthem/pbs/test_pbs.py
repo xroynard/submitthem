@@ -345,7 +345,7 @@ def test_update_parameters_error(tmp_path: Path) -> None:
         executor.update_parameters(blublu=12)
 
 
-def test_ntasks_per_node_conversion(tmp_path: Path) -> None:
+def test_ntasks_per_node_conversion(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node is properly converted to PBS mpiprocs format"""
     # Test: ntasks_per_node with nodes
     string = pbs._make_qsub_string(
@@ -361,7 +361,7 @@ def test_ntasks_per_node_conversion(tmp_path: Path) -> None:
     assert "2:" in select_lines[0]  # 2 nodes
 
 
-def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:
+def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node works without explicit nodes parameter"""
     string = pbs._make_qsub_string(
         command="test",
@@ -374,7 +374,7 @@ def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:
     assert "mpiprocs=8" in select_lines[0]
 
 
-def test_ntasks_per_node_with_cpus_per_task(tmp_path: Path) -> None:
+def test_ntasks_per_node_with_cpus_per_task(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node works with cpus_per_task"""
     string = pbs._make_qsub_string(
         command="test",

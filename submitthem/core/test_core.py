@@ -49,14 +49,14 @@ class MockedSubprocess:
             return self._subprocess_check_output(command, **kwargs)
         raise ValueError(f'Unknown command to mock "{command}".')
 
-    def _get_array_count(self, submission_file: Path) -> int:
+    def _get_array_count(self, submission_file: Path) -> int:  # pylint: disable=unused-argument
         """Parse array count from submission file.
         Override in subclass for scheduler-specific array specification format.
         Returns 0 if no array specification found (non-array job).
         """
         return 0
 
-    def set_job_state(self, job_id: str, state: str, array: int = 0) -> None:
+    def set_job_state(self, job_id: str, state: str, array: int = 0) -> None:  # pylint: disable=unused-argument
         self.job_info[job_id] = self._format_info(state, job_id, array)
         self.last_job = job_id
 
