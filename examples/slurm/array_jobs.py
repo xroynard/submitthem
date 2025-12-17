@@ -55,6 +55,7 @@ def main():
     # Collect results
     print("\nCollecting results...")
     import time
+
     start_time = time.time()
     results = []
     for i, job in enumerate(jobs):
@@ -64,7 +65,9 @@ def main():
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time
             results.append(result)
-            print(f"[{total_elapsed:6.1f}s] Dataset {result['dataset_id']}: processed {result['processed_items']} items (waited {job_elapsed:5.1f}s)")
+            print(
+                f"[{total_elapsed:6.1f}s] Dataset {result['dataset_id']}: processed {result['processed_items']} items (waited {job_elapsed:5.1f}s)"
+            )
         except Exception as e:
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time

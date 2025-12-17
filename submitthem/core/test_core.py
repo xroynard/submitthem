@@ -30,10 +30,10 @@ class MockedSubprocess:
 
     # Default headers/templates used to build mock scheduler output; subclasses can override.
     INFO_HEADER = "JobID|State"
-    INFO_TEMPLATES: tp.Tuple[str, ...] = ("{j}|{state}",)
+    INFO_TEMPLATES: tuple[str, ...] = ("{j}|{state}",)
 
-    def __init__(self, known_cmds: tp.Optional[tp.Sequence[str]] = None) -> None:
-        self.job_info: tp.Dict[str, str] = {}
+    def __init__(self, known_cmds: tp.Sequence[str] | None = None) -> None:
+        self.job_info: dict[str, str] = {}
         self.last_job: str = ""
         self._subprocess_check_output = subprocess.check_output
         self.known_cmds = known_cmds or []
@@ -49,14 +49,14 @@ class MockedSubprocess:
             return self._subprocess_check_output(command, **kwargs)
         raise ValueError(f'Unknown command to mock "{command}".')
 
-    def _get_array_count(self, submission_file: Path) -> int:
+    def _get_array_count(self, submission_file: Path) -> int:  # pylint: disable=unused-argument
         """Parse array count from submission file.
         Override in subclass for scheduler-specific array specification format.
         Returns 0 if no array specification found (non-array job).
         """
         return 0
 
-    def set_job_state(self, job_id: str, state: str, array: int = 0) -> None:
+    def set_job_state(self, job_id: str, state: str, array: int = 0) -> None:  # pylint: disable=unused-argument
         self.job_info[job_id] = self._format_info(state, job_id, array)
         self.last_job = job_id
 
@@ -64,7 +64,7 @@ class MockedSubprocess:
         # Default textual format used by scheduler info mocks. Subclasses may
         # override INFO_HEADER and INFO_TEMPLATES to mimic scheduler output.
         header = getattr(self, "INFO_HEADER", self.INFO_HEADER)
-        templates: tp.Tuple[str, ...] = getattr(self, "INFO_TEMPLATES", self.INFO_TEMPLATES)
+        templates: tuple[str, ...] = getattr(self, "INFO_TEMPLATES", self.INFO_TEMPLATES)
 
         def render(j: str) -> str:
             return "\n".join(t.format(j=j, state=state) for t in templates)
@@ -75,7 +75,7 @@ class MockedSubprocess:
             lines = "\n".join(render(f"{job_id}_{i}") for i in range(array))
         return "\n".join((header, lines))
 
-    def which(self, name: str) -> tp.Optional[str]:
+    def which(self, name: str) -> str | None:
         return "here" if name in self.known_cmds else None
 
     def mock_cmd_fn(self, *args, **_):
@@ -90,7 +90,7 @@ class MockedSubprocess:
                     with patch("subprocess.check_call", new=self):
                         yield None
 
-    def get_job_context_env_vars(self, job_id: str) -> tp.Dict[str, str]:
+    def get_job_context_env_vars(self, job_id: str) -> dict[str, str]:
         """Return dict of environment variables to set in job context.
         Subclasses should return scheduler-specific env vars.
         Default is generic minimal env.
@@ -107,6 +107,7 @@ class MockedSubprocess:
         Uses get_job_context_env_vars() for scheduler-specific variables."""
         with utils.environment_variables(**self.get_job_context_env_vars(job_id)):
             yield None
+
 
 class FakeInfoWatcher(core.InfoWatcher):
     # pylint: disable=abstract-method
@@ -135,14 +136,14 @@ class FakeExecutor(core.PicklingExecutor):
         """
         return command + "2"  # this makes "echo 12"
 
-    def _make_submission_command(self, submission_file_path: Path) -> tp.List[str]:
+    def _make_submission_command(self, submission_file_path: Path) -> list[str]:
         """Create the submission command."""
         with submission_file_path.open("r") as f:
             text: str = f.read()
         return text.split()  # this makes ["echo", "12"]
 
     @staticmethod
-    def _get_job_id_from_submission_command(string: tp.Union[bytes, str]) -> str:
+    def _get_job_id_from_submission_command(string: bytes | str) -> str:
         return string if isinstance(string, str) else string.decode()  # this returns "12"
 
 
@@ -221,13 +222,13 @@ def test_fake_executor_batch(tmp_path: Path) -> None:
         with executor.batch():
             job = executor.submit(_three_time, 8)
             assert isinstance(job, core.DelayedJob)
-            job.job_id  # pylint: disable=pointless-statement
+            _ = job.job_id  # pylint: disable=pointless-statement
         assert isinstance(job, core.DelayedJob)
 
     with executor.batch(allow_implicit_submissions=True):
         job = executor.submit(_three_time, 8)
         assert isinstance(job, core.DelayedJob)
-        job.job_id  # pylint: disable=pointless-statement
+        _ = job.job_id  # pylint: disable=pointless-statement
         assert isinstance(job, FakeJob)
         assert not executor._delayed_batch
 
@@ -260,6 +261,7 @@ def test_max_pickle_size_gb(tmp_path: Path) -> None:
     executor = FakeExecutor(folder=tmp_path, max_pickle_size_gb=0)
     with pytest.raises(RuntimeError):
         _ = executor.submit(_three_time, 4)
+
 
 if __name__ == "__main__":
     args, kwargs = [], {}  # oversimplisitic parser

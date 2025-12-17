@@ -4,10 +4,10 @@
 # LICENSE file in the root directory of this source tree.
 #
 
+import asyncio
 from pathlib import Path
 
 import pytest
-import asyncio
 
 from . import submission, utils
 from .test_core import FakeExecutor, _three_time

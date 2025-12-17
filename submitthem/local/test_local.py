@@ -71,7 +71,7 @@ def test_local_map_array(tmp_path: Path) -> None:
 
 def test_local_submit_array(tmp_path: Path) -> None:
     g = test_debug.CheckFunction(5)
-    fns = [functools.partial(g, x, y) for x, y in zip(g.data1, g.data2)]
+    fns = [functools.partial(g, x, y) for x, y in zip(g.data1, g.data2, strict=False)]
     executor = local.LocalExecutor(tmp_path)
     jobs = executor.submit_array(fns)
     assert list(map(g, g.data1, g.data2)) == [j.result() for j in jobs]

@@ -6,14 +6,13 @@
 
 import logging.config
 import os
-from typing import Union
 
 # provide a way to change level through SUBMITTHEM_LOG_LEVEL environment variable:
 # level "CRITICAL" (50) or more (eg.: "100") will deactivate submitthem logger
 # "NOCONFIG" will avoid configuration
 LOG_VARNAME = "SUBMITTHEM_LOG_LEVEL"
 level_str = os.environ.get(LOG_VARNAME, "INFO").upper()
-level: Union[int, str] = level_str if not level_str.isdigit() else int(level_str)
+level: int | str = level_str if not level_str.isdigit() else int(level_str)
 
 
 CONFIG = {

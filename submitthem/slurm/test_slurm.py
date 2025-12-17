@@ -24,7 +24,7 @@ from . import slurm
 def _mock_log_files(job: Job[tp.Any], prints: str = "", errors: str = "") -> None:
     """Write fake log files"""
     filepaths = [str(x).replace("%j", str(job.job_id)) for x in [job.paths.stdout, job.paths.stderr]]
-    for filepath, msg in zip(filepaths, (prints, errors)):
+    for filepath, msg in zip(filepaths, (prints, errors), strict=False):
         with Path(filepath).open("w") as f:
             f.write(msg)
 
@@ -63,7 +63,7 @@ class MockedSlurmSubprocess(test_core.MockedSubprocess):
             return int(array_str) + 1
         return 0
 
-    def get_job_context_env_vars(self, job_id: str) -> tp.Dict[str, str]:
+    def get_job_context_env_vars(self, job_id: str) -> dict[str, str]:
         """Return SLURM-specific environment variables for job execution"""
         return {
             "_USELESS_TEST_ENV_VAR_": "1",
@@ -81,7 +81,6 @@ def mocked_slurm() -> tp.Iterator[MockedSlurmSubprocess]:
     finally:
         # Clear the state of the shared watcher
         slurm.SlurmJob.watcher.clear()
-
 
 
 def test_mocked_missing_state(tmp_path: Path) -> None:
@@ -135,10 +134,10 @@ def test_slurm_job_array_mocked(use_batch_api: bool, tmp_path: Path) -> None:
             assert y in data2
             return x + y
 
-        jobs: tp.List[Job[int]] = []
+        jobs: list[Job[int]] = []
         if use_batch_api:
             with executor.batch():
-                for d1, d2 in zip(data1, data2):
+                for d1, d2 in zip(data1, data2, strict=False):
                     jobs.append(executor.submit(add, d1, d2))
         else:
             jobs = executor.map_array(add, data1, data2)
@@ -154,7 +153,7 @@ def test_slurm_job_array_mocked(use_batch_api: bool, tmp_path: Path) -> None:
         assert list(map(add, data1, data2)) == [j.result() for j in jobs]
         # check submission file
         sbatch = Job(tmp_path, job_id=array_id).paths.submission_file.read_text()
-        array_line = [l.strip() for l in sbatch.splitlines() if "--array" in l]
+        array_line = [line.strip() for line in sbatch.splitlines() if "--array" in line]
         assert array_line == ["#SBATCH --array=0-4%3"]
 
 
@@ -174,7 +173,7 @@ def test_slurm_error_mocked(tmp_path: Path) -> None:
 
 
 @contextlib.contextmanager
-def mock_requeue(called_with: tp.Optional[int] = None, not_called: bool = False):
+def mock_requeue(called_with: int | None = None, not_called: bool = False):
     assert not_called or called_with is not None
     requeue = patch("submitthem.slurm.slurm.SlurmJobEnvironment._requeue", return_value=None)
     with requeue as _patch:
@@ -230,8 +229,9 @@ def test_requeuing_checkpointable(tmp_path: Path, fast_forward_clock) -> None:
 
     # The job has already timed out twice, we should stop here.
     usr_sig = slurm.SlurmJobEnvironment._usr_sig()
-    with mock_requeue(not_called=True), pytest.raises(
-        utils.UncompletedJobError, match="timed-out too many times."
+    with (
+        mock_requeue(not_called=True),
+        pytest.raises(utils.UncompletedJobError, match="timed-out too many times."),
     ):
         sig.checkpoint_and_try_requeue(usr_sig)
 
@@ -260,8 +260,9 @@ def test_requeuing_not_checkpointable(tmp_path: Path, fast_forward_clock) -> Non
     fast_forward_clock(minutes=50)
 
     # Wait 50 minutes, now the job as timed out.
-    with mock_requeue(not_called=True), pytest.raises(
-        utils.UncompletedJobError, match="timed-out and not checkpointable"
+    with (
+        mock_requeue(not_called=True),
+        pytest.raises(utils.UncompletedJobError, match="timed-out and not checkpointable"),
     ):
         sig.checkpoint_and_try_requeue(usr_sig)
 
@@ -299,7 +300,7 @@ def test_make_sbatch_string() -> None:
         record_file.write_text(string)
     recorded = record_file.read_text()
     changes = []
-    for k, (line1, line2) in enumerate(zip(string.splitlines(), recorded.splitlines())):
+    for k, (line1, line2) in enumerate(zip(string.splitlines(), recorded.splitlines(), strict=False)):
         if line1 != line2:
             changes.append(f'line #{k + 1}: "{line2}" -> "{line1}"')
     if changes:
@@ -371,7 +372,7 @@ def test_read_info_array(name: str, state: str) -> None:
         ("20_[0%1]", [(20, 0)]),
     ],
 )
-def test_read_job_id(job_id: str, expected: tp.List[tp.Tuple[tp.Union[int, str], ...]]) -> None:
+def test_read_job_id(job_id: str, expected: list[tuple[int | str, ...]]) -> None:
     output = slurm.read_job_id(job_id)
     assert output == [tuple(str(x) for x in group) for group in expected]
 
@@ -515,12 +516,12 @@ def test_slurm_weird_dir(weird_tmp_path: Path) -> None:
 
     # Try to read sbatch flags from the file like sbatch would do it.
     sbatch_args = {}
-    for l in job.paths.submission_file.read_text().splitlines():
-        if not l.startswith("#SBATCH"):
+    for line in job.paths.submission_file.read_text().splitlines():
+        if not line.startswith("#SBATCH"):
             continue
-        if "=" not in l:
+        if "=" not in line:
             continue
-        key, val = l[len("#SBATCH") :].strip().split("=", 1)
+        key, val = line[len("#SBATCH") :].strip().split("=", 1)
         sbatch_args[key] = val.replace("%j", job.job_id).replace("%t", "0")
 
     # We do not quote --output and --error values here,
@@ -530,7 +531,7 @@ def test_slurm_weird_dir(weird_tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("params", [{}, {"mem_gb": None}])  # type: ignore
-def test_slurm_through_auto(params: tp.Dict[str, int], tmp_path: Path) -> None:
+def test_slurm_through_auto(params: dict[str, int], tmp_path: Path) -> None:
     with mocked_slurm():
         executor = submitthem.AutoExecutor(folder=tmp_path)
         executor.update_parameters(**params, slurm_additional_parameters={"mem_per_gpu": 12})

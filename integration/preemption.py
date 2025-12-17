@@ -5,17 +5,16 @@
 #
 
 """Preemption tests, need to be run on a an actual cluster"""
+
 import getpass
 import logging
 import shutil
-import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
 
 import submitthem
-from submitthem import AutoExecutor, Job
-from submitthem.core import test_core
+from submitthem import Job
 
 FILE = Path(__file__)
 LOGS = FILE.parent / "logs" / f"{FILE.stem}_log"
@@ -72,6 +71,28 @@ def wait_job_is_running(job: Job) -> None:
 
 
 def preemption():
+    """
+    Run an integration test that verifies job preemption behavior.
+    This function:
+    - Submits a "learnlab" job and waits until it is running.
+    - Determines the node where the job runs and then submits a higher-priority "devlab"
+        job pinned to the same node to force preemption.
+    - Waits for the priority job to start and examines the original job's stderr for
+        an interruption message.
+    - Asserts that exactly one interruption line appears and that the original job's
+        state reflects being preempted (expected to be PENDING).
+    - Waits for the priority job to finish before returning.
+    Notes on interrupted_ts:
+    - The variable interrupted_ts holds the timestamp (as a parsed string) extracted from
+        the interruption message line matching "!!! Interrupted on: <timestamp>".
+    - Typical uses for interrupted_ts include logging and debugging, correlating the
+        interruption event with other logs, asserting timing/ordering constraints between
+        events (e.g., that the preemption occurred within an expected window), or making
+        further assertions about the system behavior after the interruption.
+    Side effects:
+    - Submits real cluster jobs and blocks until the priority job completes.
+    - May raise AssertionError if expected interruption conditions are not met.
+    """
     job = pascal_job("learnlab", timeout_min=2 * 60)
     log.info(f"Scheduled {job}, {job.paths.stdout}")
     # log.info(job.paths.submission_file.read_text())
@@ -92,12 +113,21 @@ def preemption():
         f"Job {priority_job} ({priority_job.state}) started, "
         f"job {job} ({job.state}) should have been preempted: {learfair_stderr}"
     )
-    interruptions = [l for l in learfair_stderr.splitlines() if "Interrupted" in l]
+    interruptions = [line for line in learfair_stderr.splitlines() if "Interrupted" in line]
     assert len(interruptions) == 1, interruptions
     assert job.state in ("PENDING"), job.state
 
     interrupted_ts = interruptions[0].split("!!! Interrupted on: ")[-1]
-    interrupted = datetime.fromisoformat(interrupted_ts)
+    try:
+        interrupted_dt = datetime.fromisoformat(interrupted_ts)
+    except ValueError:
+        log.warning(f"Could not parse interruption timestamp: {interrupted_ts}")
+    else:
+        elapsed = datetime.now() - interrupted_dt
+        log.info(
+            f"Interruption recorded at {interrupted_dt.isoformat()} ({elapsed.total_seconds():.1f}s ago)"
+        )
+        assert elapsed.total_seconds() < 3600, "Interruption timestamp is unexpectedly old"
 
     priority_job.result()
     print("Preemption test succeeded ✅")

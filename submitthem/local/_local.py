@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .local import Controller
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     assert len(sys.argv) == 2, "Usage: _local.py <submitthem_folder>"
     # most arguments are read from environment variables.
     controller = Controller(Path(sys.argv[1]))

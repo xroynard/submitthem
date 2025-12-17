@@ -24,7 +24,7 @@ from . import pbs
 def _mock_log_files(job: Job[tp.Any], prints: str = "", errors: str = "") -> None:
     """Write fake log files"""
     filepaths = [str(x).replace("%j", str(job.job_id)) for x in [job.paths.stdout, job.paths.stderr]]
-    for filepath, msg in zip(filepaths, (prints, errors)):
+    for filepath, msg in zip(filepaths, (prints, errors), strict=False):
         with Path(filepath).open("w") as f:
             f.write(msg)
 
@@ -70,14 +70,13 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
             return int(array_str) + 1
         return 0
 
-    def get_job_context_env_vars(self, job_id: str) -> tp.Dict[str, str]:
+    def get_job_context_env_vars(self, job_id: str) -> dict[str, str]:
         """Return PBS-specific environment variables for job execution"""
         return {
             "_USELESS_TEST_ENV_VAR_": "1",
             "SUBMITTHEM_EXECUTOR": "pbs",
             "PBS_JOBID": str(job_id),
         }
-
 
 
 @contextlib.contextmanager
@@ -143,10 +142,10 @@ def test_pbs_job_array_mocked(use_batch_api: bool, tmp_path: Path) -> None:
             assert y in data2
             return x + y
 
-        jobs: tp.List[Job[int]] = []
+        jobs: list[Job[int]] = []
         if use_batch_api:
             with executor.batch():
-                for d1, d2 in zip(data1, data2):
+                for d1, d2 in zip(data1, data2, strict=False):
                     jobs.append(executor.submit(add, d1, d2))
         else:
             jobs = executor.map_array(add, data1, data2)
@@ -182,7 +181,7 @@ def test_pbs_error_mocked(tmp_path: Path) -> None:
 
 
 @contextlib.contextmanager
-def mock_requeue(called_with: tp.Optional[int] = None, not_called: bool = False):
+def mock_requeue(called_with: int | None = None, not_called: bool = False):
     assert not_called or called_with is not None
     requeue = patch("submitthem.pbs.pbs.PBSJobEnvironment._requeue", return_value=None)
     with requeue as _patch:
@@ -238,8 +237,9 @@ def test_requeuing_checkpointable(tmp_path: Path, fast_forward_clock) -> None:
 
     # The job has already timed out twice, we should stop here.
     usr_sig = pbs.PBSJobEnvironment._usr_sig()
-    with mock_requeue(not_called=True), pytest.raises(
-        utils.UncompletedJobError, match="timed-out too many times."
+    with (
+        mock_requeue(not_called=True),
+        pytest.raises(utils.UncompletedJobError, match="timed-out too many times."),
     ):
         sig.checkpoint_and_try_requeue(usr_sig)
 
@@ -268,8 +268,9 @@ def test_requeuing_not_checkpointable(tmp_path: Path, fast_forward_clock) -> Non
     fast_forward_clock(minutes=50)
 
     # Wait 50 minutes, now the job as timed out.
-    with mock_requeue(not_called=True), pytest.raises(
-        utils.UncompletedJobError, match="timed-out and not checkpointable"
+    with (
+        mock_requeue(not_called=True),
+        pytest.raises(utils.UncompletedJobError, match="timed-out and not checkpointable"),
     ):
         sig.checkpoint_and_try_requeue(usr_sig)
 
@@ -307,7 +308,7 @@ def test_make_qsub_string() -> None:
         record_file.write_text(string)
     recorded = record_file.read_text()
     changes = []
-    for k, (line1, line2) in enumerate(zip(string.splitlines(), recorded.splitlines())):
+    for k, (line1, line2) in enumerate(zip(string.splitlines(), recorded.splitlines(), strict=False)):
         if line1 != line2:
             changes.append(f'line #{k + 1}: "{line2}" -> "{line1}"')
     if changes:
@@ -344,7 +345,7 @@ def test_update_parameters_error(tmp_path: Path) -> None:
         executor.update_parameters(blublu=12)
 
 
-def test_ntasks_per_node_conversion(tmp_path: Path) -> None:
+def test_ntasks_per_node_conversion(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node is properly converted to PBS mpiprocs format"""
     # Test: ntasks_per_node with nodes
     string = pbs._make_qsub_string(
@@ -360,7 +361,7 @@ def test_ntasks_per_node_conversion(tmp_path: Path) -> None:
     assert "2:" in select_lines[0]  # 2 nodes
 
 
-def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:
+def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node works without explicit nodes parameter"""
     string = pbs._make_qsub_string(
         command="test",
@@ -373,7 +374,7 @@ def test_ntasks_per_node_without_nodes(tmp_path: Path) -> None:
     assert "mpiprocs=8" in select_lines[0]
 
 
-def test_ntasks_per_node_with_cpus_per_task(tmp_path: Path) -> None:
+def test_ntasks_per_node_with_cpus_per_task(tmp_path: Path) -> None:  # pylint: disable=unused-argument
     """Test that ntasks_per_node works with cpus_per_task"""
     string = pbs._make_qsub_string(
         command="test",
@@ -506,7 +507,8 @@ def test_read_info_qstat_format() -> None:
 
 
 @pytest.mark.parametrize(  # type: ignore
-    "name,state", [("12_0", "RUNNING"), ("12_1", "UNKNOWN"), ("12_2", "EXITING"), ("12_3", "UNKNOWN"), ("12_4", "EXITING")]
+    "name,state",
+    [("12_0", "RUNNING"), ("12_1", "UNKNOWN"), ("12_2", "EXITING"), ("12_3", "UNKNOWN"), ("12_4", "EXITING")],
 )
 def test_read_info_array(name: str, state: str) -> None:
     example = "Job ID           S\n12_0             R\n12_[2,4-12]      X\n"
@@ -527,7 +529,7 @@ def test_read_info_array(name: str, state: str) -> None:
         ("20_[0%1]", [(20, 0)]),
     ],
 )
-def test_read_job_id(job_id: str, expected: tp.List[tp.Tuple[tp.Union[int, str], ...]]) -> None:
+def test_read_job_id(job_id: str, expected: list[tuple[int | str, ...]]) -> None:
     output = pbs.read_job_id(job_id)
     assert output == [tuple(str(x) for x in group) for group in expected]
 
@@ -677,23 +679,23 @@ def test_pbs_weird_dir(weird_tmp_path: Path) -> None:
         # PBS format can be:
         # #PBS -o /path/to/file
         # #PBS -l select=...
-        parts = line[len("#PBS"):].strip().split(None, 1)  # Split on first whitespace
+        parts = line[len("#PBS") :].strip().split(None, 1)  # Split on first whitespace
         if len(parts) == 2:
             key, val = parts
             # Remove leading dash(es)
-            key = key.lstrip('-')
+            key = key.lstrip("-")
             qsub_args[key] = val.replace("%j", job.job_id).replace("%t", "0")
 
     # Verify output and error files are properly quoted
     # PBS uses -o for output and -e for error
-    if 'o' in qsub_args:
+    if "o" in qsub_args:
         subprocess.check_call("ls " + qsub_args["o"], shell=True)
-    if 'e' in qsub_args:
+    if "e" in qsub_args:
         subprocess.check_call("ls " + qsub_args["e"], shell=True)
 
 
 @pytest.mark.parametrize("params", [{}, {"mem_gb": None}])  # type: ignore
-def test_pbs_through_auto(params: tp.Dict[str, int], tmp_path: Path) -> None:
+def test_pbs_through_auto(params: dict[str, int], tmp_path: Path) -> None:
     with mocked_pbs():
         executor = submitthem.AutoExecutor(folder=tmp_path)
         executor.update_parameters(**params, pbs_additional_parameters={"mem_per_gpu": 12})

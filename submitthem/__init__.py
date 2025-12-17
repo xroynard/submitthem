@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-""""Python 3.10+ toolbox for submitting jobs to Slurm/PBS"""
+"""Python 3.10+ toolbox for submitting jobs to Slurm/PBS"""
 
 # allow explicit reimports (mypy) by renaming all imports
 from . import helpers as helpers
@@ -15,9 +15,9 @@ from .local.debug import DebugExecutor as DebugExecutor
 from .local.debug import DebugJob as DebugJob
 from .local.local import LocalExecutor as LocalExecutor
 from .local.local import LocalJob as LocalJob
-from .slurm.slurm import SlurmExecutor as SlurmExecutor
-from .slurm.slurm import SlurmJob as SlurmJob
 from .pbs.pbs import PBSExecutor as PBSExecutor
 from .pbs.pbs import PBSJob as PBSJob
+from .slurm.slurm import SlurmExecutor as SlurmExecutor
+from .slurm.slurm import SlurmJob as SlurmJob
 
-__version__ = "1.5.3"
+__version__ = "1.0.0"

@@ -7,7 +7,7 @@
 import functools
 import os
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any
 
 import pytest
 
@@ -57,7 +57,7 @@ def test_debug_map_array(tmp_path: Path) -> None:
 def test_debug_submit_array(tmp_path: Path) -> None:
     g = CheckFunction(5)
     executor = debug.DebugExecutor(tmp_path)
-    fns = [functools.partial(g, x, y) for x, y in zip(g.data1, g.data2)]
+    fns = [functools.partial(g, x, y) for x, y in zip(g.data1, g.data2, strict=False)]
     jobs = executor.submit_array(fns)
     assert list(map(g, g.data1, g.data2)) == [j.result() for j in jobs]
 
@@ -79,7 +79,7 @@ def f_42() -> int:
 
 
 def test_debug_triggered(tmp_path: Path) -> None:
-    def get_result(job: Job) -> Tuple[bool, Any]:
+    def get_result(job: Job) -> tuple[bool, Any]:
         assert isinstance(job, debug.DebugJob)
         return (job._submission._done, job._submission._result)
 
