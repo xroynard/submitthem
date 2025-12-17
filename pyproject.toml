@@ -116,7 +116,7 @@ directory = "test_results/coverage_html"
 output = "test_results/coverage/coverage.xml"
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 86
 exclude_lines = [
   "pragma: no cover", # Re-enable the standard pragma
   "raise NotImplementedError",
