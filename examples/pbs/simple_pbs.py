@@ -68,17 +68,20 @@ def main():
     # Monitor and collect results
     print("\nWaiting for simulations to complete...")
     import time
+
     start_time = time.time()
     results = []
-    for i, job in enumerate(jobs):
+    for job in jobs:
         job_start = time.time()
         try:
             result = job.result()
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time
             results.append(result)
-            print(f"[{total_elapsed:6.1f}s] Job {job.job_id} (sim {result['simulation_id']}): "
-                  f"energy={result['total_energy']:.2f} (waited {job_elapsed:5.1f}s)")
+            print(
+                f"[{total_elapsed:6.1f}s] Job {job.job_id} (sim {result['simulation_id']}): "
+                f"energy={result['total_energy']:.2f} (waited {job_elapsed:5.1f}s)"
+            )
         except Exception as e:
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time

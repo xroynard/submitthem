@@ -43,10 +43,10 @@ def main():
             mem_gb=8,  # Request 8 GB memory
         )
         print("Configured SLURM parameters:")
-        print(f"  Time: 10 minutes")
-        print(f"  GPUs per node: 1")
-        print(f"  Tasks: 4")
-        print(f"  Memory: 8 GB")
+        print("  Time: 10 minutes")
+        print("  GPUs per node: 1")
+        print("  Tasks: 4")
+        print("  Memory: 8 GB")
         print()
 
     # Submit jobs
@@ -61,6 +61,7 @@ def main():
     # Monitor jobs
     print("\nWaiting for jobs to complete...")
     import time
+
     start_time = time.time()
     results = []
     for i, job in enumerate(jobs):
@@ -70,7 +71,9 @@ def main():
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time
             results.append(result)
-            print(f"[{total_elapsed:6.1f}s] Job {job.job_id} (n={problem_sizes[i]}): {result} (waited {job_elapsed:5.1f}s)")
+            print(
+                f"[{total_elapsed:6.1f}s] Job {job.job_id} (n={problem_sizes[i]}): {result} (waited {job_elapsed:5.1f}s)"
+            )
         except Exception as e:
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time

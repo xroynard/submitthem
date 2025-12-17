@@ -6,8 +6,9 @@
 
 import functools
 import os
+from collections.abc import Mapping
 from importlib import metadata
-from typing import TYPE_CHECKING, List, Mapping, Tuple, Type
+from typing import TYPE_CHECKING
 
 from ..core import logger
 
@@ -26,15 +27,25 @@ def _iter_submitthem_entrypoints():
     return eps.select(group="submitthem")
 
 
-@functools.lru_cache()
-def _get_plugins() -> Tuple[List[Type["Executor"]], List["JobEnvironment"]]:
+@functools.lru_cache
+def _get_plugins() -> tuple[list[type["Executor"]], list["JobEnvironment"]]:
     # pylint: disable=cyclic-import,import-outside-toplevel
     from ..local import debug, local
-    from ..slurm import slurm
     from ..pbs import pbs
+    from ..slurm import slurm
 
-    executors: List[Type["Executor"]] = [slurm.SlurmExecutor, pbs.PBSExecutor, local.LocalExecutor, debug.DebugExecutor]
-    job_envs = [slurm.SlurmJobEnvironment(), pbs.PBSJobEnvironment(), local.LocalJobEnvironment(), debug.DebugJobEnvironment()]
+    executors: list[type[Executor]] = [
+        slurm.SlurmExecutor,
+        pbs.PBSExecutor,
+        local.LocalExecutor,
+        debug.DebugExecutor,
+    ]
+    job_envs = [
+        slurm.SlurmJobEnvironment(),
+        pbs.PBSJobEnvironment(),
+        local.LocalJobEnvironment(),
+        debug.DebugJobEnvironment(),
+    ]
     for entry_point in _iter_submitthem_entrypoints():
         if entry_point.name not in ("executor", "job_environment"):
             logger.warning(f"{entry_point.name} = {entry_point.value}")
@@ -66,8 +77,8 @@ def _get_plugins() -> Tuple[List[Type["Executor"]], List["JobEnvironment"]]:
     return (executors, job_envs)
 
 
-@functools.lru_cache()
-def get_executors() -> Mapping[str, Type["Executor"]]:
+@functools.lru_cache
+def get_executors() -> Mapping[str, type["Executor"]]:
     # TODO: check collisions between executor names
     return {ex.name(): ex for ex in _get_plugins()[0]}
 
@@ -90,6 +101,6 @@ def get_job_environment() -> "JobEnvironment":
     )
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_job_environments() -> Mapping[str, "JobEnvironment"]:
     return {env.name(): env for env in _get_plugins()[1]}

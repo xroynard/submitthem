@@ -147,9 +147,9 @@ def main():
 
     score = job.result()
     print(f"Finished training. Final score: {score}.")
-    print(f"---------------- Job output ---------------------")
+    print("---------------- Job output ---------------------")
     print(job.stdout())
-    print(f"-------------------------------------------------")
+    print("-------------------------------------------------")
 
     assert model_path.exists()
     with open(model_path, "rb") as f:

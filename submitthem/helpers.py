@@ -43,9 +43,9 @@ class Checkpointable:
     # pylint: disable=unused-argument
     def __new__(cls, *args, **kwargs):
         instance = super().__new__(cls)
-        assert callable(
-            instance
-        ), f"Class {cls.__name__} is marked as Checkpointable but doesn't have a __call__ method. Please add a __call__ method."
+        assert callable(instance), (
+            f"Class {cls.__name__} is marked as Checkpointable but doesn't have a __call__ method. Please add a __call__ method."
+        )
         return instance
 
     def checkpoint(self, *args: tp.Any, **kwargs: tp.Any) -> DelayedSubmission:
@@ -80,7 +80,7 @@ class FunctionSequence(Checkpointable):
 
     def __init__(self, verbose: bool = False) -> None:
         self.verbose = verbose
-        self.delayed_functions: tp.List[DelayedSubmission] = []
+        self.delayed_functions: list[DelayedSubmission] = []
 
     def add(self, func: tp.Callable[..., tp.Any], *args: tp.Any, **kwargs: tp.Any) -> None:
         self.delayed_functions.append(DelayedSubmission(func, *args, **kwargs))
@@ -91,7 +91,7 @@ class FunctionSequence(Checkpointable):
     def __iter__(self) -> tp.Iterator[DelayedSubmission]:
         return iter(self.delayed_functions)
 
-    def __call__(self) -> tp.List[tp.Any]:  # pylint: disable=arguments-differ
+    def __call__(self) -> list[tp.Any]:  # pylint: disable=arguments-differ
         if self.verbose:
             done = sum(f.done() for f in self)  # those were computed before checkpoint
             print(f"Starting from {done}/{len(self.delayed_functions)}", flush=True)
@@ -102,7 +102,7 @@ class FunctionSequence(Checkpointable):
 
 def as_completed(
     jobs: tp.Sequence[core.Job[core.R]],
-    timeout: tp.Optional[tp.Union[int, float]] = None,
+    timeout: int | float | None = None,
     poll_frequency: float = 10,
 ) -> tp.Iterator[core.Job[core.R]]:
     """
@@ -128,7 +128,7 @@ def as_completed(
         The next completed job
     """
     start = time.time()
-    jobs_done: tp.Set[int] = set()
+    jobs_done: set[int] = set()
     while True:
         if timeout is not None and time.time() - start > timeout:
             raise TimeoutError
@@ -176,7 +176,7 @@ class RsyncSnapshot:
     def __init__(
         self,
         snapshot_dir: Path,
-        root_dir: tp.Optional[Path] = None,
+        root_dir: Path | None = None,
         with_submodules: bool = False,
         exclude: tp.Sequence[str] = (),
         include: tp.Sequence[str] = (),
@@ -223,7 +223,7 @@ class RsyncSnapshot:
         os.chdir(self.original_dir)
 
 
-def _default_custom_logging(monitoring_start_time: float, n_jobs: int, state_jobs: tp.Dict[str, tp.Set[int]]):
+def _default_custom_logging(monitoring_start_time: float, n_jobs: int, state_jobs: dict[str, set[int]]):
     run_time = time.time() - monitoring_start_time
     date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     failed_job_indices = sorted(state_jobs["FAILED"])
@@ -268,7 +268,7 @@ def monitor_jobs(
         print("There are no jobs to monitor")
         return
 
-    job_arrays = ", ".join(sorted(set(str(job.job_id).split("_", 1)[0] for job in jobs)))
+    job_arrays = ", ".join(sorted({str(job.job_id).split("_", 1)[0] for job in jobs}))
     print(f"Monitoring {n_jobs} jobs from job arrays {job_arrays} \n")
 
     monitoring_start_time = time.time()

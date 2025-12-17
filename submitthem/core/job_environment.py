@@ -33,7 +33,7 @@ class JobEnvironment:
     # can be overiden (eg: export SUBMITTHEM_PREEMPT_SIGNAL=USR2)
     # CAUTION: NCCL may catch USR1 so it should be avoided
     USR_SIG = os.environ.get(_PREEMPT_SIG_ENV, "USR2")
-    _env: tp.ClassVar[tp.Dict[str, str]] = {}
+    _env: tp.ClassVar[dict[str, str]] = {}
 
     def __new__(cls, *args: tp.Any) -> "JobEnvironment":
         if cls is not JobEnvironment:
@@ -89,12 +89,12 @@ class JobEnvironment:
         return os.environ[self._env["job_id"]]
 
     @property
-    def array_job_id(self) -> tp.Optional[str]:
+    def array_job_id(self) -> str | None:
         n = "array_job_id"
         return None if n not in self._env else os.environ.get(self._env[n], None)
 
     @property
-    def array_task_id(self) -> tp.Optional[str]:
+    def array_task_id(self) -> str | None:
         n = "array_task_id"
         return None if n not in self._env else os.environ.get(self._env[n], None)
 
@@ -129,7 +129,7 @@ class JobEnvironment:
         info = [f"{n}={getattr(self, n)}" for n in ("job_id", "hostname")]
         names = ("local_rank", "node", "global_rank")
         totals = [self.num_tasks // self.num_nodes, self.num_nodes, self.num_tasks]
-        info += [f"{n}={getattr(self, n)}({t})" for n, t in zip(names, totals)]
+        info += [f"{n}={getattr(self, n)}({t})" for n, t in zip(names, totals, strict=False)]
         info_str = ", ".join(info)
         return f"JobEnvironment({info_str})"
 
@@ -192,11 +192,11 @@ class SignalHandler:
         return timed_out
 
     # pylint:disable=unused-argument
-    def bypass(self, signum: int, frame: tp.Optional[types.FrameType] = None) -> None:
+    def bypass(self, signum: int, frame: types.FrameType | None = None) -> None:
         self._logger.warning(f"Bypassing signal {signal.Signals(signum).name}")
 
     # pylint:disable=unused-argument
-    def checkpoint_and_try_requeue(self, signum: int, frame: tp.Optional[types.FrameType] = None) -> None:
+    def checkpoint_and_try_requeue(self, signum: int, frame: types.FrameType | None = None) -> None:
         timed_out = self.has_timed_out()
         case = "timed-out" if timed_out else "preempted"
         self._logger.warning(
@@ -229,7 +229,7 @@ class SignalHandler:
         self._exit()
 
     # pylint:disable=unused-argument
-    def checkpoint_and_exit(self, signum: int, frame: tp.Optional[types.FrameType] = None) -> None:
+    def checkpoint_and_exit(self, signum: int, frame: types.FrameType | None = None) -> None:
         # Note: no signal is actually bound to `checkpoint_and_exit` but this is used by plugins.
         self._logger.info(f"Caught signal {signal.Signals(signum).name} on {socket.gethostname()}")
 

@@ -36,8 +36,8 @@ def main():
     )
 
     print("Local executor configuration:")
-    print(f"  Executor type: LocalExecutor")
-    print(f"  Folder: ./local_jobs")
+    print("  Executor type: LocalExecutor")
+    print("  Folder: ./local_jobs")
     print()
 
     # Submit jobs with different data IDs
@@ -52,6 +52,7 @@ def main():
     # Collect results as jobs complete
     print("\nCollecting results...")
     import time
+
     start_time = time.time()
     results = []
     for job in jobs:

@@ -25,7 +25,7 @@ def test_env(env: JobEnvironment) -> None:
 
 
 @pytest.mark.parametrize("ex", plugins.get_executors().values())
-def test_executors(ex: tp.Type[core.Executor]) -> None:
+def test_executors(ex: type[core.Executor]) -> None:
     assert isinstance(ex, type)
     assert issubclass(ex, core.Executor)
     assert ex.affinity() >= -1
@@ -119,6 +119,7 @@ def _plugin_creator(tmp_path: Path, monkeypatch) -> tp.Iterator[PluginCreator]:
     with creator:
         yield creator
 
+
 def test_find_good_plugin(plugin_creator: PluginCreator) -> None:
     plugin_creator.add_plugin(
         "submitthem_good",
@@ -172,7 +173,7 @@ class BadEnvironment:
         (logging.WARNING, "unsupported_key = submitthem_bad:SomethingElse"),
     ]
     assert len(caplog.records) == len(expected)
-    for record, ex_record in zip(caplog.records, expected):
+    for record, ex_record in zip(caplog.records, expected, strict=False):
         assert record.name == "submitthem"
         assert record.levelno == ex_record[0]
         assert re.search(ex_record[1], record.getMessage())

@@ -21,7 +21,7 @@ from pathlib import Path
 from ..core import core, job_environment, logger, utils
 
 
-def read_job_id(job_id: str) -> tp.List[tp.Tuple[str, ...]]:
+def read_job_id(job_id: str) -> list[tuple[str, ...]]:
     """Reads formated job id and returns a tuple with format:
     (main_id, [array_index, [final_array_index])
     """
@@ -52,7 +52,7 @@ def read_job_id(job_id: str) -> tp.List[tp.Tuple[str, ...]]:
 
 
 class PBSInfoWatcher(core.InfoWatcher):
-    def _make_command(self) -> tp.Optional[tp.List[str]]:
+    def _make_command(self) -> list[str] | None:
         # ask qstat for full info on each main job id
         to_check = {x.split("_")[0] for x in self._registered - self._finished}
         if not to_check:
@@ -97,7 +97,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             # We haven't checked qstat yet, so job might just not have appeared
             return "PENDING"
 
-    def read_info(self, string: tp.Union[bytes, str]) -> tp.Dict[str, tp.Dict[str, str]]:
+    def read_info(self, string: bytes | str) -> dict[str, dict[str, str]]:
         """Parse qstat output and return dict mapping job_id/_index -> stats dict.
 
         Handles multiple formats:
@@ -139,13 +139,15 @@ class PBSInfoWatcher(core.InfoWatcher):
         result = self._read_info_qstat_format(lines, state_map)
         return result
 
-    def _read_info_qstat_f_format(self, lines: tp.List[str], state_map: tp.Dict[str, str]) -> tp.Dict[str, tp.Dict[str, str]]:
+    def _read_info_qstat_f_format(
+        self, lines: list[str], state_map: dict[str, str]
+    ) -> dict[str, dict[str, str]]:
         """Parse qstat -f format output (full format, multi-line blocks)"""
-        all_stats: tp.Dict[str, tp.Dict[str, str]] = {}
+        all_stats: dict[str, dict[str, str]] = {}
 
         # Split input into job blocks
-        blocks: tp.List[tp.List[str]] = []
-        current: tp.List[str] = []
+        blocks: list[list[str]] = []
+        current: list[str] = []
         for ln in lines:
             # Start of a job block in qstat -f
             if re.match(r"^Job Id:\s*\S+", ln):
@@ -172,12 +174,16 @@ class PBSInfoWatcher(core.InfoWatcher):
             raw_jobid = raw_jobid.split(".", 1)[0]
             # Normalize bracketed array form "12345[1-3]" -> "12345_[1-3]"
             # Only add underscore if not already present
-            normalized_jobid = raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            normalized_jobid = (
+                raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            )
             # Normalize JobID in output: add underscore before brackets if not already present
-            output_jobid = raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            output_jobid = (
+                raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            )
 
             # Parse key = value lines
-            stats: tp.Dict[str, str] = {}
+            stats: dict[str, str] = {}
             for ln in block[1:]:
                 kv = re.match(r"^\s*(\S+)\s*=\s*(.*)$", ln)
                 if not kv:
@@ -197,7 +203,7 @@ class PBSInfoWatcher(core.InfoWatcher):
                 # exec_host like "node01/0+node02/0" -> "node01,node02"
                 parts = re.split(r"\+|,", node_list_raw)
                 nodes = []
-                seen: tp.Set[str] = set()
+                seen: set[str] = set()
                 for p in parts:
                     host = p.split("/")[0].strip()
                     if host and host not in seen:
@@ -209,7 +215,11 @@ class PBSInfoWatcher(core.InfoWatcher):
             try:
                 multi = read_job_id(normalized_jobid)
             except Exception as e:
-                warnings.warn(f"Could not interpret {raw_jobid} correctly (please open an issue):\n{e}", DeprecationWarning)
+                warnings.warn(
+                    f"Could not interpret {raw_jobid} correctly (please open an issue):\n{e}",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
                 continue
 
             # Expand array ranges
@@ -218,7 +228,7 @@ class PBSInfoWatcher(core.InfoWatcher):
                 if len(split_job_id) == 1:
                     # Non-array job
                     key = main_id
-                    out_stats: tp.Dict[str, str] = {"JobID": output_jobid, "State": state_val}
+                    out_stats: dict[str, str] = {"JobID": output_jobid, "State": state_val}
                     if node_list_str:
                         out_stats["NodeList"] = node_list_str
                     all_stats[key] = out_stats
@@ -243,7 +253,9 @@ class PBSInfoWatcher(core.InfoWatcher):
 
         return all_stats
 
-    def _read_info_qstat_format(self, lines: tp.List[str], state_map: tp.Dict[str, str]) -> tp.Dict[str, tp.Dict[str, str]]:
+    def _read_info_qstat_format(
+        self, lines: list[str], state_map: dict[str, str]
+    ) -> dict[str, dict[str, str]]:
         """Parse simple qstat format with fixed-width columns.
 
         Format:
@@ -255,7 +267,7 @@ class PBSInfoWatcher(core.InfoWatcher):
         JobID            S
         5610980          R
         """
-        all_stats: tp.Dict[str, tp.Dict[str, str]] = {}
+        all_stats: dict[str, dict[str, str]] = {}
 
         if not lines:
             return all_stats
@@ -317,7 +329,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             state_letter = ""
             if state_pos >= 0 and len(line) > state_pos:
                 # State should be a single non-space character around the S column
-                state_letter = line[state_pos:state_pos + 2].strip()
+                state_letter = line[state_pos : state_pos + 2].strip()
                 if len(state_letter) > 1:
                     state_letter = state_letter[0]
 
@@ -336,17 +348,25 @@ class PBSInfoWatcher(core.InfoWatcher):
 
             # Normalize bracketed array form "12345[1-3]" -> "12345_[1-3]"
             # Only add underscore if not already present
-            normalized_jobid = raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            normalized_jobid = (
+                raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            )
 
             # Parse the job ID to get main job and array indices
             try:
                 multi = read_job_id(normalized_jobid)
             except Exception as e:
-                warnings.warn(f"Could not interpret {raw_jobid} correctly (please open an issue):\n{e}", DeprecationWarning)
+                warnings.warn(
+                    f"Could not interpret {raw_jobid} correctly (please open an issue):\n{e}",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
                 continue
 
             # Normalize JobID in output: add underscore before brackets if not already present
-            output_jobid = raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            output_jobid = (
+                raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
+            )
 
             # Expand array ranges
             for split_job_id in multi:
@@ -401,7 +421,9 @@ class PBSInfoWatcher(core.InfoWatcher):
 
 class PBSJob(core.Job[core.R]):
     _cancel_command = "qdel"
-    watcher = PBSInfoWatcher(delay_s=60)  # Check status frequently during job allocation/execution (max 60s between checks)
+    watcher = PBSInfoWatcher(
+        delay_s=60
+    )  # Check status frequently during job allocation/execution (max 60s between checks)
 
     @property
     def paths(self) -> utils.JobPaths:
@@ -435,7 +457,7 @@ class PBSParseException(Exception):
     pass
 
 
-def _expand_id_suffix(suffix_parts: str) -> tp.List[str]:
+def _expand_id_suffix(suffix_parts: str) -> list[str]:
     """Parse the a suffix formatted like "1-3,5,8" into
     the list of numeric values 1,2,3,5,8.
     """
@@ -450,7 +472,9 @@ def _expand_id_suffix(suffix_parts: str) -> tp.List[str]:
                 raise PBSParseException(f"Invalid range format in '{suffix_parts}': '{suffix_part}'")
             low, high = parts
             if not low or not high:
-                raise PBSParseException(f"Invalid range format in '{suffix_parts}': '{suffix_part}' (missing start or end)")
+                raise PBSParseException(
+                    f"Invalid range format in '{suffix_parts}': '{suffix_part}' (missing start or end)"
+                )
             try:
                 low_int = int(low)
                 high_int = int(high)
@@ -464,7 +488,7 @@ def _expand_id_suffix(suffix_parts: str) -> tp.List[str]:
     return suffixes
 
 
-def _parse_node_group(node_list: str, pos: int, parsed: tp.List[str]) -> int:
+def _parse_node_group(node_list: str, pos: int, parsed: list[str]) -> int:
     """Parse a node group of the form PREFIX[1-3,5,8] and return
     the position in the string at which the parsing stopped
     """
@@ -490,7 +514,7 @@ def _parse_node_group(node_list: str, pos: int, parsed: tp.List[str]) -> int:
 def _parse_node_list(node_list: str):
     try:
         pos = 0
-        parsed: tp.List[str] = []
+        parsed: list[str] = []
         while pos < len(node_list):
             pos = _parse_node_group(node_list, pos, parsed)
         return parsed
@@ -582,7 +606,7 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
         logger.get_logger().info(f"Requeued job {jid} ({countdown} remaining timeouts)")
 
     @property
-    def hostnames(self) -> tp.List[str]:
+    def hostnames(self) -> list[str]:
         """Return the list of hostnames for the current PBS job.
 
         PBS clusters commonly expose node information in one of these ways:
@@ -598,12 +622,12 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
         nodefile = os.environ.get(self._env["nodes"])  # PBS_NODEFILE
         if nodefile and os.path.exists(nodefile):
             try:
-                with open(nodefile, "r") as fh:
+                with open(nodefile) as fh:
                     lines = [ln.strip() for ln in fh if ln.strip()]
             except Exception:
                 lines = []
-            seen: tp.Set[str] = set()
-            parsed: tp.List[str] = []
+            seen: set[str] = set()
+            parsed: list[str] = []
             for ln in lines:
                 # Some nodefiles contain "node:ppn=4" or similar — take the hostname part.
                 host = re.split(r"[:\s/]+", ln)[0]
@@ -679,10 +703,10 @@ class PBSExecutor(core.PicklingExecutor):
 
     def __init__(
         self,
-        folder: tp.Union[str, Path],
+        folder: str | Path,
         max_num_timeout: int = 3,
         max_pickle_size_gb: float = 1.0,
-        python: tp.Optional[str] = None
+        python: str | None = None,
     ) -> None:
         super().__init__(
             folder,
@@ -706,11 +730,11 @@ class PBSExecutor(core.PicklingExecutor):
         }
 
     @classmethod
-    def _valid_parameters(cls) -> tp.Set[str]:
+    def _valid_parameters(cls) -> set[str]:
         """Parameters that can be set through update_parameters"""
         return set(_get_default_parameters())
 
-    def _convert_parameters(self, params: tp.Dict[str, tp.Any]) -> tp.Dict[str, tp.Any]:
+    def _convert_parameters(self, params: dict[str, tp.Any]) -> dict[str, tp.Any]:
         params = super()._convert_parameters(params)
         # replace type in some cases
         if "mem" in params:
@@ -756,8 +780,8 @@ class PBSExecutor(core.PicklingExecutor):
         super()._internal_update_parameters(**kwargs)
 
     def _internal_process_submissions(
-        self, delayed_submissions: tp.List[utils.DelayedSubmission]
-    ) -> tp.List[core.Job[tp.Any]]:
+        self, delayed_submissions: list[utils.DelayedSubmission]
+    ) -> list[core.Job[tp.Any]]:
         if len(delayed_submissions) == 1:
             return super()._internal_process_submissions(delayed_submissions)
         # array
@@ -780,10 +804,10 @@ class PBSExecutor(core.PicklingExecutor):
 
         first_job: core.Job[tp.Any] = array_ex._submit_command(self._submitthem_command_str)
         tasks_ids = list(range(first_job.num_tasks))
-        jobs: tp.List[core.Job[tp.Any]] = [
+        jobs: list[core.Job[tp.Any]] = [
             PBSJob(folder=self.folder, job_id=f"{first_job.job_id}_{a}", tasks=tasks_ids) for a in range(n)
         ]
-        for job, pickle_path in zip(jobs, pickle_paths):
+        for job, pickle_path in zip(jobs, pickle_paths, strict=False):
             job.paths.move_temporary_file(pickle_path, "submitted_pickle")
         return jobs
 
@@ -799,7 +823,7 @@ class PBSExecutor(core.PicklingExecutor):
         tasks_per_node: int = max(1, self.parameters.get("ntasks_per_node", 1))
         return nodes * tasks_per_node
 
-    def _make_submission_command(self, submission_file_path: Path) -> tp.List[str]:
+    def _make_submission_command(self, submission_file_path: Path) -> list[str]:
         return ["qsub", str(submission_file_path)]
 
     def _submit_command(self, command: str) -> core.Job[tp.Any]:
@@ -864,7 +888,7 @@ class PBSExecutor(core.PicklingExecutor):
         return job
 
     @staticmethod
-    def _get_job_id_from_submission_command(string: tp.Union[bytes, str]) -> str:
+    def _get_job_id_from_submission_command(string: bytes | str) -> str:
         """Returns the job ID from the output of qsub string"""
         if not isinstance(string, str):
             string = string.decode()
@@ -887,48 +911,48 @@ class PBSExecutor(core.PicklingExecutor):
         return -1 if shutil.which("qsub") is None else 2
 
 
-@functools.lru_cache()
-def _get_default_parameters() -> tp.Dict[str, tp.Any]:
+@functools.lru_cache
+def _get_default_parameters() -> dict[str, tp.Any]:
     """Parameters that can be set through update_parameters"""
     specs = inspect.getfullargspec(_make_qsub_string)
-    zipped = zip(specs.args[-len(specs.defaults) :], specs.defaults)  # type: ignore
+    zipped = zip(specs.args[-len(specs.defaults) :], specs.defaults, strict=False)  # type: ignore
     return {key: val for key, val in zipped if key not in {"command", "folder", "map_count"}}
 
 
 # pylint: disable=too-many-arguments,unused-argument, too-many-locals
 def _make_qsub_string(
     command: str,
-    folder: tp.Union[str, Path],
+    folder: str | Path,
     job_name: str = "submitthem",
-    partition: tp.Optional[str] = None,
+    partition: str | None = None,
     time: int = 5,
     nodes: int = 1,
-    ntasks_per_node: tp.Optional[int] = None,
-    cpus_per_task: tp.Optional[int] = None,
-    cpus_per_gpu: tp.Optional[int] = None,
-    num_gpus: tp.Optional[int] = None,  # legacy
-    gpus_per_node: tp.Optional[int] = None,
-    gpus_per_task: tp.Optional[int] = None,
-    qos: tp.Optional[str] = None,  # quality of service
-    setup: tp.Optional[tp.List[str]] = None,
-    mem: tp.Optional[str] = None,
-    mem_per_gpu: tp.Optional[str] = None,
-    mem_per_cpu: tp.Optional[str] = None,
+    ntasks_per_node: int | None = None,
+    cpus_per_task: int | None = None,
+    cpus_per_gpu: int | None = None,
+    num_gpus: int | None = None,  # legacy
+    gpus_per_node: int | None = None,
+    gpus_per_task: int | None = None,
+    qos: str | None = None,  # quality of service
+    setup: list[str] | None = None,
+    mem: str | None = None,
+    mem_per_gpu: str | None = None,
+    mem_per_cpu: str | None = None,
     signal_delay_s: int = 90,
-    comment: tp.Optional[str] = None,
-    constraint: tp.Optional[str] = None,
-    exclude: tp.Optional[str] = None,
-    account: tp.Optional[str] = None,
-    gres: tp.Optional[str] = None,
-    mail_type: tp.Optional[str] = None,
-    mail_user: tp.Optional[str] = None,
-    nodelist: tp.Optional[str] = None,
-    dependency: tp.Optional[str] = None,
-    exclusive: tp.Optional[tp.Union[bool, str]] = None,
+    comment: str | None = None,
+    constraint: str | None = None,
+    exclude: str | None = None,
+    account: str | None = None,
+    gres: str | None = None,
+    mail_type: str | None = None,
+    mail_user: str | None = None,
+    nodelist: str | None = None,
+    dependency: str | None = None,
+    exclusive: bool | str | None = None,
     array_parallelism: int = 256,
     stderr_to_stdout: bool = False,
-    map_count: tp.Optional[int] = None,  # used internally
-    additional_parameters: tp.Optional[tp.Dict[str, tp.Any]] = None,
+    map_count: int | None = None,  # used internally
+    additional_parameters: dict[str, tp.Any] | None = None,
 ) -> str:
     """Creates the content of a qsub file with provided parameters
 
@@ -1016,7 +1040,7 @@ def _make_qsub_string(
         mem_num: float = 0.0
         if isinstance(mem_val, str):
             # Extract numeric part
-            match = re.match(r'(\d+(?:\.\d+)?)', mem_val)
+            match = re.match(r"(\d+(?:\.\d+)?)", mem_val)
             mem_num = float(match.group(1)) if match else 0.0
         else:
             mem_num = float(mem_val) if mem_val is not None else 0.0
@@ -1067,7 +1091,10 @@ def _make_qsub_string(
     if "cpus_per_gpu" in parameters:
         parameters.pop("cpus_per_gpu")
         if gpus_per_task_val is None:
-            warnings.warn('"cpus_per_gpu" requires to set "gpus_per_task" to work (and not "gpus_per_node")')
+            warnings.warn(
+                '"cpus_per_gpu" requires to set "gpus_per_task" to work (and not "gpus_per_node")',
+                stacklevel=2,
+            )
 
     # Remove legacy num_gpus parameter and warn if used
     if "num_gpus" in parameters:
@@ -1076,7 +1103,7 @@ def _make_qsub_string(
             '"num_gpus" is deprecated. Use "gpus_per_node", "gpus_per_task", '
             'or "gres" instead for PBS compatibility.',
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
 
     # add necessary parameters
@@ -1115,7 +1142,7 @@ def _make_qsub_string(
         "export SUBMITTHEM_EXECUTOR=pbs",
         "# Allow time for qalter to set output file paths before job starts writing logs",
         "sleep 0.5",
-        "# The input \"command\" is supposed to be a valid shell command",
+        '# The input "command" is supposed to be a valid shell command',
         "set -e  # Exit on error",
         command,
         "",
@@ -1137,14 +1164,14 @@ def _as_qsub_flag(key: str, value: tp.Any) -> str:
     """
     # Handle special key mappings for PBS compatibility
     pbs_flag_map = {
-        'job-name': 'N',
-        'output': 'o',
-        'error': 'e',
-        'join': 'j',
-        'J': 'J',  # Array job range
-        'select': 'l select',
-        'place': 'l place',
-        'walltime': 'l walltime',
+        "job-name": "N",
+        "output": "o",
+        "error": "e",
+        "join": "j",
+        "J": "J",  # Array job range
+        "select": "l select",
+        "place": "l place",
+        "walltime": "l walltime",
     }
 
     # Map the key if it's in our special map
@@ -1161,7 +1188,7 @@ def _as_qsub_flag(key: str, value: tp.Any) -> str:
     value_str = shlex.quote(str(value))
 
     # Different formatting for different flag types
-    if key.startswith('l ') or key.startswith('W '):
+    if key.startswith("l ") or key.startswith("W "):
         # Resource list and -W flags use -flag key=value format
         return f"#PBS -{key}={value_str}"
     else:

@@ -77,6 +77,7 @@ def main():
     # This can be more efficient if your scheduler supports batch operations
     print("Collecting results with batch monitoring...")
     import time
+
     start_time = time.time()
 
     results = []
@@ -90,13 +91,19 @@ def main():
             total_elapsed = time.time() - start_time
             results.append(result)
             if result["success"]:
-                print(f"[{total_elapsed:6.1f}s] Job {job.job_id}: processed {result['total_processed']} items (waited {job_elapsed:5.1f}s)")
+                print(
+                    f"[{total_elapsed:6.1f}s] Job {job.job_id}: processed {result['total_processed']} items (waited {job_elapsed:5.1f}s)"
+                )
             else:
-                print(f"[{total_elapsed:6.1f}s] Job {job.job_id}: completed with {result['errors']} errors (waited {job_elapsed:5.1f}s)")
+                print(
+                    f"[{total_elapsed:6.1f}s] Job {job.job_id}: completed with {result['errors']} errors (waited {job_elapsed:5.1f}s)"
+                )
         except Exception as e:
             job_elapsed = time.time() - job_start
             total_elapsed = time.time() - start_time
-            print(f"[{total_elapsed:6.1f}s] Job {job.job_id}: failed after {job_elapsed:5.1f}s with error {e}")
+            print(
+                f"[{total_elapsed:6.1f}s] Job {job.job_id}: failed after {job_elapsed:5.1f}s with error {e}"
+            )
             failed_jobs.append(job.job_id)
 
     # Summary

@@ -7,20 +7,20 @@
 import typing as tp
 import warnings
 from pathlib import Path
-from typing import Any, List, Optional, Type, Union
+from typing import Any
 
 from ..core import plugins
 from ..core.core import Executor, Job
 from ..core.utils import DelayedSubmission
 
 
-def _convert_deprecated_args(kwargs: tp.Dict[str, Any], deprecated_args: tp.Mapping[str, str]) -> None:
+def _convert_deprecated_args(kwargs: dict[str, Any], deprecated_args: tp.Mapping[str, str]) -> None:
     for arg in list(kwargs):
         new_arg = deprecated_args.get(arg)
         if not new_arg:
             continue
         kwargs[new_arg] = kwargs.pop(arg)
-        warnings.warn(f"Setting '{arg}' is deprecated. Use '{new_arg}' instead.")
+        warnings.warn(f"Setting '{arg}' is deprecated. Use '{new_arg}' instead.", stacklevel=2)
 
 
 class AutoExecutor(Executor):
@@ -61,7 +61,7 @@ class AutoExecutor(Executor):
 
     _ctor_deprecated_args = {"max_num_timeout": "slurm_max_num_timeout", "conda_file": "chronos_conda_file"}
 
-    def __init__(self, folder: Union[str, Path], cluster: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(self, folder: str | Path, cluster: str | None = None, **kwargs: Any) -> None:
         self.cluster = cluster or self.which()
 
         executors = plugins.get_executors()
@@ -74,9 +74,9 @@ class AutoExecutor(Executor):
         for name in kwargs:
             assert "_" in name, f"{err} '{name}'. {err_ex_list}"
             prefix = name.split("_")[0]
-            assert (
-                prefix in executors
-            ), f"{err} '{name}', and '{prefix}' executor is also unknown. {err_ex_list}"
+            assert prefix in executors, (
+                f"{err} '{name}', and '{prefix}' executor is also unknown. {err_ex_list}"
+            )
         self._executor = flexible_init(executors[self.cluster], folder, **kwargs)
 
         valid = self._valid_parameters()
@@ -99,7 +99,7 @@ class AutoExecutor(Executor):
 
         return best_ex
 
-    def register_dev_folders(self, folders: List[Union[str, Path]]) -> None:
+    def register_dev_folders(self, folders: list[str | Path]) -> None:
         """Archive a list of folders to be untarred in the job working directory.
         This is only implemented for internal cluster, for running job on non-installed packages.
         This is not useful on slurm since the working directory of jobs is identical to
@@ -114,11 +114,12 @@ class AutoExecutor(Executor):
         else:
             # TODO this should be done through update parameters
             warnings.warn(
-                "Ignoring dev folder registration as it is only supported (and needed) for internal cluster"
+                "Ignoring dev folder registration as it is only supported (and needed) for internal cluster",
+                stacklevel=2,
             )
 
     @classmethod
-    def _typed_parameters(cls) -> tp.Dict[str, Type]:
+    def _typed_parameters(cls) -> dict[str, type]:
         return {
             "name": str,
             "timeout_min": int,
@@ -131,7 +132,7 @@ class AutoExecutor(Executor):
         }
 
     @classmethod
-    def _valid_parameters(cls) -> tp.Set[str]:
+    def _valid_parameters(cls) -> set[str]:
         return set(cls._typed_parameters().keys())
 
     def _internal_update_parameters(self, **kwargs: Any) -> None:
@@ -156,11 +157,11 @@ class AutoExecutor(Executor):
         # check type of replaced variables
         generics = AutoExecutor._typed_parameters()
         for name, expected_type in generics.items():
-            if expected_type == float:
+            if expected_type is float:
                 expected_type = (int, float)  # type: ignore
             if name in kwargs:
                 assert isinstance(kwargs[name], expected_type), (
-                    f'Parameter "{name}" expected type {expected_type} ' f'(but value: "{kwargs[name]}")'
+                    f'Parameter "{name}" expected type {expected_type} (but value: "{kwargs[name]}")'
                 )
 
         _convert_deprecated_args(kwargs, self._deprecated_args)
@@ -213,11 +214,11 @@ class AutoExecutor(Executor):
         self._executor._internal_update_parameters(**parameters)
 
     def _internal_process_submissions(
-        self, delayed_submissions: tp.List[DelayedSubmission]
-    ) -> tp.List[Job[tp.Any]]:
+        self, delayed_submissions: list[DelayedSubmission]
+    ) -> list[Job[tp.Any]]:
         return self._executor._internal_process_submissions(delayed_submissions)
 
 
-def flexible_init(cls: Type[Executor], folder: Union[str, Path], **kwargs: Any) -> Executor:
+def flexible_init(cls: type[Executor], folder: str | Path, **kwargs: Any) -> Executor:
     prefix = cls.name() + "_"
     return cls(folder, **{k[len(prefix) :]: val for k, val in kwargs.items() if k.startswith(prefix)})

@@ -44,11 +44,11 @@ def _get_root() -> Path:
     return root
 
 
-def _get_markdown_files(root: Path) -> tp.List[Path]:
+def _get_markdown_files(root: Path) -> list[Path]:
     return [md for pattern in ("*.md", "submitthem/**/*.md", "docs/**/*.md") for md in root.glob(pattern)]
 
 
-def _get_all_markdown_links(root: Path, files: tp.List[Path]) -> tp.List[MarkdownLink]:
+def _get_all_markdown_links(root: Path, files: list[Path]) -> list[MarkdownLink]:
     """Returns a list of all existing markdown links"""
     pattern = MarkdownLink.regex
     links = []
@@ -65,7 +65,7 @@ def test_assert_markdown_links_not_broken() -> None:
 
     links = _get_all_markdown_links(root, files)
     assert len(links) > 5, "There should be several hyperlinks!"
-    broken_links = [l for l in links if not l.exists()]
+    broken_links = [link for link in links if not link.exists()]
     assert not broken_links
 
 

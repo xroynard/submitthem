@@ -23,13 +23,13 @@ LOCAL_REQUEUE_RETURN_CODE = 144
 
 # global variable storing unfinished processes of pickled jobs
 # in case we need to reload them later
-_PROCESSES: tp.Dict[str, "subprocess.Popen['bytes']"] = {}
+_PROCESSES: dict[str, "subprocess.Popen['bytes']"] = {}
 
 
 class LocalJob(core.Job[R]):
     def __init__(
         self,
-        folder: tp.Union[Path, str],
+        folder: Path | str,
         job_id: str,
         tasks: tp.Sequence[int] = (0,),
         process: tp.Optional["subprocess.Popen['bytes']"] = None,
@@ -37,7 +37,7 @@ class LocalJob(core.Job[R]):
         super().__init__(folder, job_id, tasks)
         self._cancel_at_deletion = False
         # downcast sub-jobs to get proper typing
-        self._sub_jobs: tp.Sequence["LocalJob[R]"] = self._sub_jobs
+        self._sub_jobs: tp.Sequence[LocalJob[R]] = self._sub_jobs
         # set process (to self and subjobs)
         self._process = process
         for sjob in self._sub_jobs:
@@ -57,7 +57,7 @@ class LocalJob(core.Job[R]):
         except Exception:  # pylint: disable=broad-except
             return "UNKNOWN"
 
-    def get_info(self, mode: str = "force") -> tp.Dict[str, str]:  # pylint: disable=unused-argument
+    def get_info(self, mode: str = "force") -> dict[str, str]:  # pylint: disable=unused-argument
         """Returns information about the job as a dict."""
         if self._process is None:
             state = "NO PROCESS AND NO RESULT"
@@ -147,10 +147,11 @@ class LocalExecutor(core.PicklingExecutor):
     job_class = LocalJob
 
     def __init__(
-        self, folder: tp.Union[str, Path],
+        self,
+        folder: str | Path,
         max_num_timeout: int = 3,
         max_pickle_size_gb: float = 1.0,
-        python: tp.Optional[str] = None
+        python: str | None = None,
     ) -> None:
         super().__init__(
             folder,
@@ -163,7 +164,7 @@ class LocalExecutor(core.PicklingExecutor):
         indep_folder.mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def _valid_parameters(cls) -> tp.Set[str]:
+    def _valid_parameters(cls) -> set[str]:
         """Parameters that can be set through update_parameters"""
         return {"setup"}
 
@@ -229,11 +230,11 @@ class LocalExecutor(core.PicklingExecutor):
         return ""
 
     @staticmethod
-    def _get_job_id_from_submission_command(string: tp.Union[bytes, str]) -> str:
+    def _get_job_id_from_submission_command(string: bytes | str) -> str:
         # Not used, but need an implementation
         return "0"
 
-    def _make_submission_command(self, submission_file_path: Path) -> tp.List[str]:
+    def _make_submission_command(self, submission_file_path: Path) -> list[str]:
         # Not used, but need an implementation
         return []
 
@@ -294,9 +295,9 @@ class Controller:
         self.timeout_s = int(os.environ["SUBMITTHEM_LOCAL_TIMEOUT_S"])
         self.signal_delay_s = int(os.environ["SUBMITTHEM_LOCAL_SIGNAL_DELAY_S"])
         self.stderr_to_stdout = bool(os.environ["SUBMITTHEM_STDERR_TO_STDOUT"])
-        self.tasks: tp.List[subprocess.Popen] = []  # type: ignore
-        self.stdouts: tp.List[tp.IO[tp.Any]] = []
-        self.stderrs: tp.List[tp.IO[tp.Any]] = []
+        self.tasks: list[subprocess.Popen] = []  # type: ignore
+        self.stdouts: list[tp.IO[tp.Any]] = []
+        self.stderrs: list[tp.IO[tp.Any]] = []
         # When shell=True, the shell's PID is written to a file by start_controller.
         # Read it if it exists, otherwise use os.getpid()
         folder_path = Path(folder)
@@ -324,7 +325,9 @@ class Controller:
         for k in range(self.ntasks):
             env = dict(os.environ)
             env.update(
-                SUBMITTHEM_LOCAL_LOCALID=str(k), SUBMITTHEM_LOCAL_GLOBALID=str(k), SUBMITTHEM_LOCAL_JOB_ID=self.pid
+                SUBMITTHEM_LOCAL_LOCALID=str(k),
+                SUBMITTHEM_LOCAL_GLOBALID=str(k),
+                SUBMITTHEM_LOCAL_JOB_ID=self.pid,
             )
             self.tasks.append(
                 subprocess.Popen(  # pylint: disable=consider-using-with
@@ -352,7 +355,7 @@ class Controller:
         for f in files:
             f.close()
 
-    def wait(self, freq: int = 24) -> tp.Sequence[tp.Optional[int]]:
+    def wait(self, freq: int = 24) -> tp.Sequence[int | None]:
         """Waits for all tasks to finish or to time-out.
 
         Returns
