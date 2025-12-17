@@ -94,10 +94,15 @@ disable = """
     useless-import-alias,
     unspecified-encoding,
     too-many-positional-arguments,
+    too-many-lines,
+    duplicate-code,
 """
 
 [tool.pylint.DESIGN]
 max-args = 6
+max-locals = 40  # PBS and Slurm modules have complex parsing
+max-branches = 30  # Job parsing requires many conditional branches
+max-statements = 100  # Some functions need many steps for job parsing
 
 [tool.pylint.FORMAT]
 max-line-length = "140"

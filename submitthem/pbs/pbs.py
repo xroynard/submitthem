@@ -327,7 +327,7 @@ class PBSInfoWatcher(core.InfoWatcher):
 
             # Extract state - look for the single character in the S column
             state_letter = ""
-            if state_pos >= 0 and len(line) > state_pos:
+            if 0 <= state_pos < len(line):
                 # State should be a single non-space character around the S column
                 state_letter = line[state_pos : state_pos + 2].strip()
                 if len(state_letter) > 1:
