@@ -27,6 +27,7 @@ Tracker = "https://github.com/xroynard/submitthem/issues"
 [tool.uv]
 # uv configuration - modern Python package manager
 python-preference = "managed"
+default-groups = ["dev"]
 
 [tool.uv.pip]
 compile-bytecode = true
@@ -52,11 +53,15 @@ format = [
 release = [
     "flit>=3.5.1",
 ]
+examples = []
+doc = []
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
     { include-group = "format" },
     { include-group = "release" },
+    { include-group = "examples" },
+    { include-group = "doc" },
 ]
 
 [tool.ruff]

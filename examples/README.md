@@ -10,16 +10,21 @@ This directory contains example scripts demonstrating how to use `submitthem` to
 
 ## Quick Start
 
+### Prerequisites
+
+Ensure you have `uv` installed. If not, install it from [uv documentation](https://docs.astral.sh/uv/)
+
 ### 1. Local Execution (Testing)
 
 For testing your job submission code locally without a real cluster:
 
 ```bash
 cd local
-python simple_job.py
+uv run simple_job.py
 ```
 
 This is useful for:
+
 - Debugging job submission logic
 - Testing your code before submitting to a real cluster
 - Understanding how submitthem works
@@ -30,7 +35,7 @@ For clusters using SLURM (Slurm Workload Manager):
 
 ```bash
 cd slurm
-python simple_slurm.py
+uv run simple_slurm.py
 ```
 
 ### 3. PBS Cluster
@@ -39,8 +44,18 @@ For clusters using PBS (Portable Batch System):
 
 ```bash
 cd pbs
-python simple_pbs.py
+uv run simple_pbs.py
 ```
+
+### Running All Examples
+
+To run all examples at once:
+
+```bash
+./run_all_examples.sh
+```
+
+This script will execute all available examples and report their status.
 
 ## Common Patterns
 

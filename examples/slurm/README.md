@@ -15,7 +15,7 @@ Basic SLURM example showing:
 
 **Run it:**
 ```bash
-python simple_slurm.py
+uv run simple_slurm.py
 ```
 
 **Key SLURM parameters used:**
@@ -35,7 +35,7 @@ Advanced example showing:
 
 **Run it:**
 ```bash
-python array_jobs.py
+uv run array_jobs.py
 ```
 
 **Key features:**

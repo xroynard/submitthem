@@ -24,7 +24,7 @@ run_example() {
     echo -e "${GREEN}Running: $scheduler/$example_name${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-    if python "$example_path"; then
+    if uv run python "$example_path"; then
         echo -e "${GREEN}✓ $scheduler/$example_name completed successfully${NC}"
     else
         echo -e "${YELLOW}⚠ $scheduler/$example_name failed or not available${NC}"

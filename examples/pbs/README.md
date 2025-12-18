@@ -15,7 +15,7 @@ Basic PBS example showing:
 
 **Run it:**
 ```bash
-python simple_pbs.py
+uv run simple_pbs.py
 ```
 
 **Key PBS parameters used:**
@@ -35,7 +35,7 @@ Advanced example showing:
 
 **Run it:**
 ```bash
-python array_jobs_pbs.py
+uv run array_jobs_pbs.py
 ```
 
 **Key features:**
