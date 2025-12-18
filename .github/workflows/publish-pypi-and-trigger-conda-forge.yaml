@@ -6,6 +6,7 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 env:
+  PACKAGE_NAME: submitthem
   FEEDSTOCK_REPO: xroynard/submitthem-feedstock
   FEEDSTOCK_NAME: submitthem-feedstock
 
@@ -21,6 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha256: ${{ steps.sha256.outputs.sha256 }}
+      package_file: ${{ steps.version.outputs.package_file }}
 
     steps:
     - uses: actions/checkout@v4
@@ -43,27 +45,24 @@ jobs:
       id: version
       run: |
         # Find the built tar.gz file
-        FILE=$(ls dist/submitthem-*.tar.gz 2>/dev/null | head -n 1)
+        FILE=$(ls dist/${{ env.PACKAGE_NAME }}-*.tar.gz 2>/dev/null | head -n 1)
         if [ -z "$FILE" ]; then
-          echo "ERROR: No sdist .tar.gz found in dist/ for submitthem" >&2
+          echo "ERROR: No sdist .tar.gz found in dist/ for ${{ env.PACKAGE_NAME }}" >&2
           exit 1
         fi
 
         # Extract version from filename
         BASENAME=$(basename "$FILE" .tar.gz)
-        VERSION=${BASENAME#submitthem-}
+        VERSION=${BASENAME#${{ env.PACKAGE_NAME }}-}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "package_file=$FILE" >> $GITHUB_OUTPUT
         echo "✅ Version extracted: $VERSION"
 
     - name: Compute SHA256 hash
       id: sha256
       run: |
-        # Find the built tar.gz file
-        FILE=$(ls dist/submitthem-*.tar.gz 2>/dev/null | head -n 1)
-        if [ -z "$FILE" ]; then
-          echo "ERROR: No sdist .tar.gz found in dist/ for submitthem" >&2
-          exit 1
-        fi
+        # Use the package file from the previous step
+        FILE="${{ steps.version.outputs.package_file }}"
 
         # Compute SHA256
         SHA256=$(sha256sum "$FILE" | awk '{print $1}')
@@ -112,14 +111,6 @@ jobs:
             "version": "${{ needs.build-and-publish.outputs.version }}",
             "sha256": "${{ needs.build-and-publish.outputs.sha256 }}"
           }
-      continue-on-error: true
-
-    - name: Check dispatch status
-      if: steps.dispatch.outcome == 'failure'
-      run: |
-        echo "ERROR: Failed to trigger feedstock repository dispatch."
-        echo "This may be due to invalid token or network issues."
-        exit 1
 
     - name: Comment on release
       if: github.event_name == 'release'
