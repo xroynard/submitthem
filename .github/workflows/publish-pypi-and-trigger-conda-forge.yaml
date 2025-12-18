@@ -5,6 +5,10 @@ on:
     types: [created]
   workflow_dispatch:  # Allow manual triggering
 
+env:
+  FEEDSTOCK_REPO: xroynard/submitthem-feedstock
+  FEEDSTOCK_NAME: submitthem-feedstock
+
 jobs:
   build-and-publish:
     name: Build and Publish to PyPI
@@ -35,24 +39,41 @@ jobs:
     - name: Build package with flit
       run: uv run flit build
 
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dist/
-
-    - name: Extract version
+    - name: Extract version and compute SHA256
       id: version
       run: |
-        VERSION=${{ github.event.release.tag_name }}
-        VERSION=${VERSION#v}  # Remove 'v' prefix if present
+        # Find the built tar.gz file
+        FILE=$(ls dist/submitthem-*.tar.gz 2>/dev/null | head -n 1)
+        if [ -z "$FILE" ]; then
+          echo "ERROR: No sdist .tar.gz found in dist/ for submitthem" >&2
+          exit 1
+        fi
+
+        # Extract version from filename
+        BASENAME=$(basename "$FILE" .tar.gz)
+        VERSION=${BASENAME#submitthem-}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "✅ Version extracted: $VERSION"
 
     - name: Compute SHA256 hash
       id: sha256
       run: |
-        SHA256=$(sha256sum dist/submitthem-${{ steps.version.outputs.version }}.tar.gz | awk '{print $1}')
+        # Find the built tar.gz file
+        FILE=$(ls dist/submitthem-*.tar.gz 2>/dev/null | head -n 1)
+        if [ -z "$FILE" ]; then
+          echo "ERROR: No sdist .tar.gz found in dist/ for submitthem" >&2
+          exit 1
+        fi
+
+        # Compute SHA256
+        SHA256=$(sha256sum "$FILE" | awk '{print $1}')
         echo "sha256=$SHA256" >> $GITHUB_OUTPUT
-        echo "✅ SHA256 computed: $SHA256"
+        echo "✅ SHA256 computed for $FILE: $SHA256"
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist/
 
     - name: Display summary
       run: |
@@ -66,32 +87,54 @@ jobs:
     needs: build-and-publish
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # Required for creating release comments
+
     steps:
+    - name: Validate FEEDSTOCK_TRIGGER_TOKEN secret
+      run: |
+        if [ -z "${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}" ]; then
+          echo "ERROR: FEEDSTOCK_TRIGGER_TOKEN secret is not set. Please add this repository secret to enable feedstock triggering."
+          exit 1
+        fi
+        echo "✅ FEEDSTOCK_TRIGGER_TOKEN secret is configured"
+
     - name: Trigger feedstock repository
+      id: dispatch
       uses: peter-evans/repository-dispatch@v2
       with:
+        # Requires FEEDSTOCK_TRIGGER_TOKEN repository secret with access to the feedstock repo
         token: ${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}
-        repository: xroynard/submitthem-feedstock
+        repository: ${{ env.FEEDSTOCK_REPO }}
         event-type: update-recipe
         client-payload: |
           {
             "version": "${{ needs.build-and-publish.outputs.version }}",
             "sha256": "${{ needs.build-and-publish.outputs.sha256 }}"
           }
+      continue-on-error: true
+
+    - name: Check dispatch status
+      if: steps.dispatch.outcome == 'failure'
+      run: |
+        echo "ERROR: Failed to trigger feedstock repository dispatch."
+        echo "This may be due to invalid token or network issues."
+        exit 1
 
     - name: Comment on release
+      if: github.event_name == 'release'
       uses: actions/github-script@v6
       with:
         script: |
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
+          await github.rest.repos.createReleaseComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: `🎉 **Released to PyPI**\n\n✅ Version: \`${{ needs.build-and-publish.outputs.version }}\`\n✅ SHA256: \`${{ needs.build-and-publish.outputs.sha256 }}\`\n\n🐍 Conda-forge feedstock update triggered!\nCheck: https://github.com/xroynard/submitthem-feedstock/pulls`
+            release_id: context.payload.release.id,
+            body: `🎉 **Released to PyPI**\n\n✅ Version: \`${{ needs.build-and-publish.outputs.version }}\`\n✅ SHA256: \`${{ needs.build-and-publish.outputs.sha256 }}\`\n\n🐍 Conda-forge feedstock update triggered!\nCheck: https://github.com/${{ env.FEEDSTOCK_REPO }}/pulls`
           })
 
     - name: Trigger conda-forge webservices
       uses: conda-forge/webservices-dispatch-action@main
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        feedstock_name: submitthem-feedstock
+        feedstock_name: ${{ env.FEEDSTOCK_NAME }}
