@@ -93,7 +93,7 @@ jobs:
     - name: Validate FEEDSTOCK_TRIGGER_TOKEN secret
       run: |
         if [ -z "${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}" ]; then
-          echo "ERROR: FEEDSTOCK_TRIGGER_TOKEN secret is not set. Please add this repository secret to enable feedstock triggering."
+          echo "ERROR: FEEDSTOCK_TRIGGER_TOKEN secret is not set or is empty. This workflow will fail at this step to prevent triggering the feedstock with invalid credentials. Please add this repository secret to enable feedstock triggering."
           exit 1
         fi
         echo "✅ FEEDSTOCK_TRIGGER_TOKEN secret is configured"
