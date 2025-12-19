@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # Required for creating release comments
+      contents: read  # Read-only contents access is sufficient; release comments don't need write
 
     steps:
     - name: Validate FEEDSTOCK_TRIGGER_TOKEN secret
