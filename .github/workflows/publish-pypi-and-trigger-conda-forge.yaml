@@ -106,11 +106,10 @@ jobs:
         token: ${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}
         repository: ${{ env.FEEDSTOCK_REPO }}
         event-type: update-recipe
-        client-payload: |
-          {
-            "version": "${{ needs.build-and-publish.outputs.version }}",
-            "sha256": "${{ needs.build-and-publish.outputs.sha256 }}"
-          }
+        client-payload: ${{ toJSON({
+          version: needs.build-and-publish.outputs.version,
+          sha256: needs.build-and-publish.outputs.sha256
+        }) }}
 
     - name: Comment on release
       if: github.event_name == 'release'
