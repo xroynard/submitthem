@@ -116,11 +116,25 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
+          const version = '${{ needs.build-and-publish.outputs.version }}';
+          const sha256 = '${{ needs.build-and-publish.outputs.sha256 }}';
+          const feedstockRepo = '${{ env.FEEDSTOCK_REPO }}';
+
+          const body = [
+            '🎉 **Released to PyPI**',
+            '',
+            `✅ Version: \`${version}\``,
+            `✅ SHA256: \`${sha256}\``,
+            '',
+            '🐍 Conda-forge feedstock update triggered!',
+            `Check: https://github.com/${feedstockRepo}/pulls`
+          ].join('\n');
+
           await github.rest.repos.createReleaseComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
             release_id: context.payload.release.id,
-            body: `🎉 **Released to PyPI**\n\n✅ Version: \`${{ needs.build-and-publish.outputs.version }}\`\n✅ SHA256: \`${{ needs.build-and-publish.outputs.sha256 }}\`\n\n🐍 Conda-forge feedstock update triggered!\nCheck: https://github.com/${{ env.FEEDSTOCK_REPO }}/pulls`
+            body
           })
 
     - name: Trigger conda-forge webservices
