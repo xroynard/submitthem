@@ -33,7 +33,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
 
     - name: Sync dependencies with uv
       run: uv sync --group release
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read  # Read-only contents access is sufficient; release comments don't need write
+      contents: write  # Required for updating release notes
 
     steps:
     - name: Validate FEEDSTOCK_TRIGGER_TOKEN secret
@@ -111,7 +111,7 @@ jobs:
           sha256: needs.build-and-publish.outputs.sha256
         }) }}
 
-    - name: Comment on release
+    - name: Update release notes
       if: github.event_name == 'release'
       uses: actions/github-script@v7
       with:
@@ -120,7 +120,10 @@ jobs:
           const sha256 = '${{ needs.build-and-publish.outputs.sha256 }}';
           const feedstockRepo = '${{ env.FEEDSTOCK_REPO }}';
 
-          const body = [
+          const releaseInfo = [
+            '',
+            '---',
+            '',
             '🎉 **Released to PyPI**',
             '',
             `✅ Version: \`${version}\``,
@@ -130,12 +133,19 @@ jobs:
             `Check: https://github.com/${feedstockRepo}/pulls`
           ].join('\n');
 
-          await github.rest.repos.createReleaseComment({
+          // Update the release notes by appending our information
+          const currentRelease = await github.rest.repos.getRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: context.payload.release.id
+          });
+
+          await github.rest.repos.updateRelease({
             owner: context.repo.owner,
             repo: context.repo.repo,
             release_id: context.payload.release.id,
-            body
-          })
+            body: currentRelease.data.body + releaseInfo
+          });
 
     - name: Trigger conda-forge webservices
       uses: conda-forge/webservices-dispatch-action@main
