@@ -144,7 +144,7 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
             release_id: context.payload.release.id,
-            body: currentRelease.data.body + releaseInfo
+            body: (currentRelease.data.body || '') + releaseInfo
           });
 
     - name: Trigger conda-forge webservices
