@@ -1,0 +1,154 @@
+name: Publish to PyPI and Trigger Conda-Forge
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  PACKAGE_NAME: submitthem
+  FEEDSTOCK_REPO: xroynard/submitthem-feedstock
+  FEEDSTOCK_NAME: submitthem-feedstock
+
+jobs:
+  build-and-publish:
+    name: Build and Publish to PyPI
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha256: ${{ steps.sha256.outputs.sha256 }}
+      package_file: ${{ steps.version.outputs.package_file }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Sync dependencies with uv
+      run: uv sync --group release
+
+    - name: Build package with flit
+      run: uv run flit build
+
+    - name: Extract version and compute SHA256
+      id: version
+      run: |
+        # Find the built tar.gz file
+        FILE=$(ls dist/${{ env.PACKAGE_NAME }}-*.tar.gz 2>/dev/null | head -n 1)
+        if [ -z "$FILE" ]; then
+          echo "ERROR: No sdist .tar.gz found in dist/ for ${{ env.PACKAGE_NAME }}" >&2
+          exit 1
+        fi
+
+        # Extract version from filename
+        BASENAME=$(basename "$FILE" .tar.gz)
+        VERSION=${BASENAME#${{ env.PACKAGE_NAME }}-}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "package_file=$FILE" >> $GITHUB_OUTPUT
+        echo "✅ Version extracted: $VERSION"
+
+    - name: Compute SHA256 hash
+      id: sha256
+      run: |
+        # Use the package file from the previous step
+        FILE="${{ steps.version.outputs.package_file }}"
+
+        # Compute SHA256
+        SHA256=$(sha256sum "$FILE" | awk '{print $1}')
+        echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+        echo "✅ SHA256 computed for $FILE: $SHA256"
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist/
+
+    - name: Display summary
+      run: |
+        echo "## 🎉 Published to PyPI" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **SHA256**: ${{ steps.sha256.outputs.sha256 }}" >> $GITHUB_STEP_SUMMARY
+
+  trigger-feedstock:
+    name: Trigger Feedstock Update
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Required for updating release notes
+
+    steps:
+    - name: Validate FEEDSTOCK_TRIGGER_TOKEN secret
+      run: |
+        if [ -z "${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}" ]; then
+          echo "ERROR: FEEDSTOCK_TRIGGER_TOKEN secret is not set or is empty. This workflow will fail at this step to prevent triggering the feedstock with invalid credentials. Please add this repository secret to enable feedstock triggering."
+          exit 1
+        fi
+        echo "✅ FEEDSTOCK_TRIGGER_TOKEN secret is configured"
+
+    - name: Trigger feedstock repository
+      id: dispatch
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        # Requires FEEDSTOCK_TRIGGER_TOKEN repository secret with access to the feedstock repo
+        token: ${{ secrets.FEEDSTOCK_TRIGGER_TOKEN }}
+        repository: ${{ env.FEEDSTOCK_REPO }}
+        event-type: update-recipe
+        client-payload: ${{ toJSON({
+          version: needs.build-and-publish.outputs.version,
+          sha256: needs.build-and-publish.outputs.sha256
+        }) }}
+
+    - name: Update release notes
+      if: github.event_name == 'release'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = '${{ needs.build-and-publish.outputs.version }}';
+          const sha256 = '${{ needs.build-and-publish.outputs.sha256 }}';
+          const feedstockRepo = '${{ env.FEEDSTOCK_REPO }}';
+
+          const releaseInfo = [
+            '',
+            '---',
+            '',
+            '🎉 **Released to PyPI**',
+            '',
+            `✅ Version: \`${version}\``,
+            `✅ SHA256: \`${sha256}\``,
+            '',
+            '🐍 Conda-forge feedstock update triggered!',
+            `Check: https://github.com/${feedstockRepo}/pulls`
+          ].join('\n');
+
+          // Update the release notes by appending our information
+          const currentRelease = await github.rest.repos.getRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: context.payload.release.id
+          });
+
+          await github.rest.repos.updateRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: context.payload.release.id,
+            body: (currentRelease.data.body || '') + '\n' + releaseInfo
+          });
+
+    - name: Trigger conda-forge webservices
+      uses: conda-forge/webservices-dispatch-action@main
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        feedstock_name: ${{ env.FEEDSTOCK_NAME }}
