@@ -18,7 +18,7 @@ The simplest example showing:
 
 **Run it:**
 ```bash
-python simple_job.py
+uv run simple_job.py
 ```
 
 **Key features:**
@@ -37,7 +37,7 @@ A more complete example showing:
 
 **Run it:**
 ```bash
-python advanced_example.py
+uv run advanced_example.py
 ```
 
 **Key features:**
