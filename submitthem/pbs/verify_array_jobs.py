@@ -204,7 +204,7 @@ def verify_qsub_files_in_folder(folder_path):
         return False
 
     print(f"Found {len(qsub_files)} qsub submission file(s):")
-    all_good = True
+    files_ok = True
 
     for qsub_file in sorted(qsub_files):
         content = qsub_file.read_text()
@@ -222,7 +222,7 @@ def verify_qsub_files_in_folder(folder_path):
             print(f"    ✓ Array directive: {j_directives[0].strip()}")
         else:
             print("    ✗ No array directive (-J)")
-            all_good = False
+            files_ok = False
 
         # Show resource specifications
         select_directives = [d for d in pbs_directives if "-l select" in d]
@@ -234,7 +234,7 @@ def verify_qsub_files_in_folder(folder_path):
         if walltime_directives:
             print(f"    ✓ Walltime: {walltime_directives[0].strip()}")
 
-    return all_good
+    return files_ok
 
 
 if __name__ == "__main__":

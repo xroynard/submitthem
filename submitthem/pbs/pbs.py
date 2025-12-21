@@ -431,8 +431,9 @@ class PBSInfoWatcher(core.InfoWatcher):
 
             state_val = state_map.get(state_letter, state_letter)
 
-            # Parse the job ID to get main job and array indices
-            # read_job_id handles bracket "3141592653589793[0]", bracket range "3141592653589793[2-4]", and underscore "3141592653589793_0" formats
+            # Parse the job ID to get main job and array indices.
+            # read_job_id handles bracket "3141592653589793[0]", bracket range
+            # "3141592653589793[2-4]", and underscore "3141592653589793_0" formats
             try:
                 multi = read_job_id(raw_jobid)
             except Exception as e:
@@ -669,8 +670,6 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
 
         Falls back to extracting array info from PBS_JOBID if PBS_ARRAY_ID is not usable.
         """
-        import re
-
         # Try to use PBS_ARRAY_ID and PBS_ARRAY_INDEX if available
         if self.array_job_id and self.array_task_id:
             # Strip any non-numeric characters from array_job_id (in case it has brackets)
@@ -714,8 +713,6 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
 
         # Remove everything after and including [ or .
         # We want just the numeric job ID
-        import re
-
         match = re.match(r"(\d+)", job_id)
         if match:
             return match.group(1)

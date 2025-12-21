@@ -9,6 +9,7 @@ import io
 import itertools
 import os
 import pickle
+import re
 import select
 import shutil
 import subprocess
@@ -113,8 +114,6 @@ class JobPaths:
 
         # Extract array ID and index from job_id
         # Handles both formats: "3141592653589793_0" (SLURM) and "3141592653589793[0]" (PBS)
-        import re
-
         bracket_match = re.match(r"(\d+)\[(\d+)\]", str(self.job_id))
         if bracket_match:
             # PBS bracket notation: "3141592653589793[0]"

@@ -100,7 +100,7 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
         }
 
         # For bracket-notation array job IDs like "12[0]" or "12[0].domain", parse and set PBS_ARRAY_ID and PBS_ARRAY_INDEX
-        job_id_no_domain = str(job_id).split(".")[0]
+        job_id_no_domain = str(job_id).split(".", maxsplit=1)[0]
         bracket_match = re.match(r"(\d+)\[(\d+)\]", job_id_no_domain)
         if bracket_match:
             env_vars["PBS_ARRAY_ID"] = bracket_match.group(1)
