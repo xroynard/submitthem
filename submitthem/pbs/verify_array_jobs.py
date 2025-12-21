@@ -36,8 +36,6 @@ from submitthem.pbs import pbs
 def test_single_job_not_array():
     """Verify that a single job submission doesn't create an array."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        executor = pbs.PBSExecutor(folder=tmpdir)
-
         # Generate qsub file for single job
         qsub_content = pbs._make_qsub_string(
             command="echo 'single job'",
@@ -53,9 +51,6 @@ def test_single_job_not_array():
 def test_multiple_jobs_create_array():
     """Verify that multiple job submissions create a PBS array."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        executor = pbs.PBSExecutor(folder=tmpdir)
-        executor.update_parameters(array_parallelism=3)
-
         # Generate qsub file for array of 5 jobs
         num_jobs = 5
         qsub_content = pbs._make_qsub_string(
@@ -86,8 +81,6 @@ def test_multiple_jobs_create_array():
 def test_array_output_file_naming():
     """Verify that output files use array index substitution."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        executor = pbs.PBSExecutor(folder=tmpdir)
-
         num_jobs = 3
         qsub_content = pbs._make_qsub_string(
             command="echo 'array job'",
@@ -117,10 +110,8 @@ def test_job_id_parsing():
         ),  # Array with list
     ]
 
-    for job_id, expected in test_cases:
+    for job_id, _expected in test_cases:
         result = pbs.read_job_id(job_id)
-        # Normalize for comparison
-        result_normalized = [tuple(x) if isinstance(x, (list, tuple)) else (x,) for x in result]
 
         print(f"  Job ID: {job_id:<20} -> {result}")
 
