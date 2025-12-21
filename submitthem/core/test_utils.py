@@ -105,7 +105,8 @@ print("printed {n} lines to stderr")
 def test_jobpaths(tmp_path: Path) -> None:
     assert utils.JobPaths(tmp_path, "123").stdout == tmp_path / "123_0_log.out"
     assert utils.JobPaths(tmp_path, "123", 1).stdout == tmp_path / "123_1_log.out"
+    # For array jobs, the index is already encoded in the job_id, so we don't add %t
     assert (
         utils.JobPaths(tmp_path / "array-%A-index-%a", "456_3").stdout
-        == tmp_path / "array-456-index-3" / "456_3_0_log.out"
+        == tmp_path / "array-456-index-3" / "456_3_log.out"
     )

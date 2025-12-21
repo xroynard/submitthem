@@ -39,10 +39,61 @@ python array_jobs_pbs.py
 ```
 
 **Key features:**
-- Demonstrates submitting 50 jobs
+- Demonstrates submitting multiple jobs as a PBS array
 - Shows batch result collection
 - Includes timeout management
-- Provides execution summary
+- Provides execution summary with array job info
+
+### verify_array_jobs.py
+
+Verification script to confirm PBS arrays are created properly.
+
+**Local verification (no cluster needed):**
+```bash
+python verify_array_jobs.py
+```
+
+This runs tests to verify:
+- Single jobs are NOT arrays
+- Multiple jobs CREATE an array with -J directive
+- Array parallelism is correctly set
+- Output files use %A_%a substitution for indices
+- Job IDs parse correctly for array formats
+
+**Cluster verification (requires actual PBS cluster):**
+```bash
+# After running array_jobs_pbs.py, verify the submission files:
+python verify_array_jobs.py --cluster ./pbs_array_jobs
+```
+
+This checks the actual qsub files submitted to PBS to verify:
+- Correct -J directive with array range
+- Proper resource specifications
+- Valid walltime and job names
+
+## PBS Job Arrays Explained
+
+When you submit multiple jobs using `submitthem`:
+
+### Traditional Way (not recommended)
+```bash
+# N separate qsub commands = N separate jobs
+qsub job1.sh   # Job ID: 12345
+qsub job2.sh   # Job ID: 12346
+qsub job3.sh   # Job ID: 12347
+```
+
+### submitthem Array Way (recommended)
+```bash
+# 1 qsub command with array directive = 1 array job
+qsub array.sh  # Job ID: 12345 with array indices 0-2
+```
+
+**Advantages:**
+- More efficient scheduler usage
+- Single queue entry for multiple tasks
+- Better resource management
+- Cleaner job tracking
 
 ## PBS Configuration
 

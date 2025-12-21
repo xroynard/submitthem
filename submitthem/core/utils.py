@@ -9,6 +9,7 @@ import io
 import itertools
 import os
 import pickle
+import re
 import select
 import shutil
 import subprocess
@@ -58,8 +59,9 @@ class JobPaths:
 
     @property
     def submission_file(self) -> Path:
-        if self.job_id and "_" in self.job_id:
+        if self.job_id and ("_" in self.job_id or "[" in self.job_id):
             # We only have one submission file per job array
+            # PBS uses "3141592653589793[0]" format, SLURM uses "3141592653589793_0" format
             return self._format_id(self.folder / "%A_submission.sh")
         return self._format_id(self.folder / "%j_submission.sh")
 
@@ -69,27 +71,77 @@ class JobPaths:
 
     @property
     def result_pickle(self) -> Path:
-        return self._format_id(self.folder / "%j_%t_result.pkl")
+        # For array jobs, the index is already encoded in job_id (e.g., "3141592653589793[0]" -> "3141592653589793_0")
+        # So we don't need to add %t separately
+        # For non-array jobs, task_id is used to distinguish multiple tasks
+        if self.job_id and ("_" in self.job_id or "[" in self.job_id):
+            # Array job - index already in job_id after %j replacement
+            return self._format_id(self.folder / "%j_result.pkl")
+        else:
+            # Non-array job - use %t for task differentiation
+            return self._format_id(self.folder / "%j_%t_result.pkl")
 
     @property
     def stderr(self) -> Path:
-        return self._format_id(self.folder / "%j_%t_log.err")
+        # For array jobs, the index is already encoded in job_id
+        # For non-array jobs, task_id is used to distinguish multiple tasks
+        if self.job_id and ("_" in self.job_id or "[" in self.job_id):
+            # Array job - index already in job_id after %j replacement
+            return self._format_id(self.folder / "%j_log.err")
+        else:
+            # Non-array job - use %t for task differentiation
+            return self._format_id(self.folder / "%j_%t_log.err")
 
     @property
     def stdout(self) -> Path:
-        return self._format_id(self.folder / "%j_%t_log.out")
+        # For array jobs, the index is already encoded in job_id
+        # For non-array jobs, task_id is used to distinguish multiple tasks
+        if self.job_id and ("_" in self.job_id or "[" in self.job_id):
+            # Array job - index already in job_id after %j replacement
+            return self._format_id(self.folder / "%j_log.out")
+        else:
+            # Non-array job - use %t for task differentiation
+            return self._format_id(self.folder / "%j_%t_log.out")
 
     def _format_id(self, path: Path | str) -> Path:
-        """Replace id tag by actual id if available"""
+        """Replace id tag by actual id if available.
+
+        Handles both underscore notation (SLURM: "3141592653589793_0") and bracket notation (PBS: "3141592653589793[0]").
+        For filesystems, converts PBS bracket notation to underscore notation.
+        """
         if self.job_id is None:
             return Path(path)
-        replaced_path = str(path).replace("%j", str(self.job_id)).replace("%t", str(self.task_id))
-        array_id, *array_index = str(self.job_id).split("_", 1)
+
+        # Extract array ID and index from job_id
+        # Handles both formats: "3141592653589793_0" (SLURM) and "3141592653589793[0]" (PBS)
+        bracket_match = re.match(r"(\d+)\[(\d+)\]", str(self.job_id))
+        if bracket_match:
+            # PBS bracket notation: "3141592653589793[0]"
+            array_id = bracket_match.group(1)
+            array_index = bracket_match.group(2)
+            # For filesystem paths, use underscore notation
+            filesystem_friendly_id = f"{array_id}_{array_index}"
+        else:
+            # SLURM underscore notation: "3141592653589793_0"
+            array_id, *array_index_list = str(self.job_id).split("_", 1)
+            array_index = array_index_list[0] if array_index_list else None
+            # Already filesystem friendly
+            filesystem_friendly_id = str(self.job_id)
+
+        # Replace %j with filesystem-friendly version (underscore notation)
+        replaced_path = str(path).replace("%j", filesystem_friendly_id)
+
+        # Replace %A and %a with array parts if present
         if "%a" in replaced_path:
-            if len(array_index) != 1:
+            if not array_index:
                 raise ValueError("%a is in the folder path but this is not a job array")
-            replaced_path = replaced_path.replace("%a", array_index[0])
-        return Path(replaced_path.replace("%A", array_id))
+            replaced_path = replaced_path.replace("%a", array_index)
+        replaced_path = replaced_path.replace("%A", array_id)
+
+        # Replace %t with task_id
+        replaced_path = replaced_path.replace("%t", str(self.task_id))
+
+        return Path(replaced_path)
 
     def move_temporary_file(self, tmp_path: Path | str, name: str, keep_as_symlink: bool = False) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)

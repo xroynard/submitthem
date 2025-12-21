@@ -287,7 +287,7 @@ def test_make_sbatch_string() -> None:
     string = slurm._make_sbatch_string(
         command="blublu bar",
         folder="/tmp",
-        partition="learnfair",
+        partition="compute_partition",
         exclusive=True,
         additional_parameters={"blublu": 12},
         srun_args=["-vv", "--cpu-bind", "none"],

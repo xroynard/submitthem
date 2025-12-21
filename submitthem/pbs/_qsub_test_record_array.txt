@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # Parameters
+#PBS -J 0-9%10
 #PBS -N submitthem
 #PBS -blublu 12
+#PBS -e /dev/null
 #PBS -l place=excl
 #PBS -l select=1:ncpus=1
 #PBS -l walltime=00:05:00
+#PBS -o /dev/null
 #PBS -q compute_partition
 
 # command
@@ -30,10 +33,10 @@ fi
 # Set up output file redirection based on job type
 if [[ -n "$PBS_ARRAY_INDEX" ]]; then
   # Array job: use per-task log file with underscore notation matching pickle files
-  OUTPUT_FILE="/tmp/${PBS_ARRAY_ID}_${PBS_ARRAY_INDEX}.log"
+  OUTPUT_FILE="/tmp/logs/${PBS_ARRAY_ID}_${PBS_ARRAY_INDEX}.log"
 else
   # Non-array job: use main job ID with consistent underscore notation
-  OUTPUT_FILE="/tmp/${MAIN_JOB_ID}_log.log"
+  OUTPUT_FILE="/tmp/logs/${MAIN_JOB_ID}_log.log"
 fi
 
 # Create output directory and redirect all output to the log file
