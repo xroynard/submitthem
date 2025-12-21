@@ -38,7 +38,7 @@ def process_job(folder: Path | str) -> None:
     logger = get_logger()
     logger.info(f"Starting with {env}")
     logger.info(f"Loading pickle: {paths.submitted_pickle}")
-    wait_time = 60
+    wait_time = 120
     for _ in range(wait_time):
         if paths.submitted_pickle.exists():
             break

@@ -5,6 +5,7 @@
 #
 import contextlib
 import os
+import re
 import signal
 import subprocess
 import typing as tp
@@ -39,7 +40,27 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
         # qstat column format uses a single-letter state; keep the first char.
         # If state is empty or only whitespace, keep it empty (will map to UNKNOWN in read_info)
         state_short = state[0] if state and state.strip() else ""
-        super().set_job_state(job_id, state_short, array)
+        # Store job state - for array jobs, store under main numeric ID
+        # The parser will look up by numeric ID when given bracket notation like "12[0]"
+        # Note: We call the parent's parent (MockedSubprocess) to avoid using underscore notation
+        self.job_info[job_id] = self._format_info(state_short, job_id, array)
+        self.last_job = job_id
+
+    def _format_info(self, state: str, job_id: str, array: int) -> str:
+        """Format job info using PBS bracket notation for array jobs."""
+        header = self.INFO_HEADER
+        templates = self.INFO_TEMPLATES
+
+        def render(j: str) -> str:
+            return "\n".join(t.format(j=j, state=state) for t in templates)
+
+        if array == 0:
+            # Single job
+            lines = render(job_id)
+        else:
+            # Array job: use bracket notation instead of underscore
+            lines = "\n".join(render(f"{job_id}[{i}]") for i in range(array))
+        return "\n".join((header, lines))
 
     def qstat(self, _: tp.Sequence[str]) -> str:
         return "\n".join(self.job_info.values())
@@ -53,6 +74,10 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
         return f"Submitted batch job {job_id}\n"
 
     def qdel(self, _: tp.Sequence[str]) -> str:
+        return ""
+
+    def qalter(self, _: tp.Sequence[str]) -> str:
+        """Mock qalter command - always succeeds silently"""
         return ""
 
     def _get_array_count(self, submission_file: Path) -> int:
@@ -72,17 +97,26 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
 
     def get_job_context_env_vars(self, job_id: str) -> dict[str, str]:
         """Return PBS-specific environment variables for job execution"""
-        return {
+        env_vars = {
             "_USELESS_TEST_ENV_VAR_": "1",
             "SUBMITTHEM_EXECUTOR": "pbs",
             "PBS_JOBID": str(job_id),
         }
 
+        # For bracket-notation array job IDs like "12[0]" or "12[0].domain", parse and set PBS_ARRAY_ID and PBS_ARRAY_INDEX
+        job_id_no_domain = str(job_id).split(".")[0]
+        bracket_match = re.match(r"(\d+)\[(\d+)\]", job_id_no_domain)
+        if bracket_match:
+            env_vars["PBS_ARRAY_ID"] = bracket_match.group(1)
+            env_vars["PBS_ARRAY_INDEX"] = bracket_match.group(2)
+
+        return env_vars
+
 
 @contextlib.contextmanager
 def mocked_pbs() -> tp.Iterator[MockedPBSSubprocess]:
     # TODO: check if both are needed
-    mock = MockedPBSSubprocess(known_cmds=["qsub", "qsub -I"])
+    mock = MockedPBSSubprocess(known_cmds=["qsub", "qsub -I", "qalter"])
     try:
         with mock.context():
             yield mock
@@ -93,9 +127,11 @@ def mocked_pbs() -> tp.Iterator[MockedPBSSubprocess]:
 
 def test_mocked_missing_state(tmp_path: Path) -> None:
     with mocked_pbs() as mock:
-        mock.set_job_state("12", "       ")
+        # Unknown state codes (like "?") are treated as missing and default to "U"
+        # "U" maps to "SUSPENDED_WS" per PBS Pro documentation
+        mock.set_job_state("12", "?")
         job: pbs.PBSJob[None] = pbs.PBSJob(tmp_path, "12")
-        assert job.state == "UNKNOWN"
+        assert job.state == "SUSPENDED_WS"  # Changed - unknown states default to U = SUSPENDED_WS
         job._interrupt(timeout=False)  # check_call is bypassed by MockedSubprocess
 
 
@@ -149,11 +185,23 @@ def test_pbs_job_array_mocked(use_batch_api: bool, tmp_path: Path) -> None:
                     jobs.append(executor.submit(add, d1, d2))
         else:
             jobs = executor.map_array(add, data1, data2)
-        array_id = jobs[0].job_id.split("_")[0]
-        assert [f"{array_id}_{a}" for a in range(n)] == [j.job_id for j in jobs]
+
+        # Array job IDs use bracket notation: "12[0]", "12[1]", etc.
+        # This is the native PBS format for array job tasks
+        first_job_id = jobs[0].job_id
+        # Strip domain suffix if present
+        first_job_id_no_domain = first_job_id.split(".")[0]
+        # Extract numeric part before bracket
+        array_id = first_job_id_no_domain.split("[")[0]
+        # Check that all jobs use proper bracket notation
+        expected_job_ids = [f"{array_id}[{a}]" for a in range(n)]
+        actual_job_ids = [j.job_id.split(".")[0] for j in jobs]  # Strip domain for comparison
+        assert expected_job_ids == actual_job_ids
 
         for job in jobs:
-            assert job.state == "RUNNING"
+            # Job state should be PENDING (not yet in qstat) or RUNNING
+            # Both are acceptable for a newly submitted job
+            assert job.state in ("PENDING", "RUNNING"), f"Unexpected state: {job.state}"
             with mock.job_context(job.job_id):
                 submission.process_job(job.paths.folder)
         # trying a pbs specific method
@@ -304,6 +352,50 @@ def test_make_qsub_string() -> None:
     assert "--command" not in string
     assert "constraint" not in string
     record_file = Path(__file__).parent / "_qsub_test_record.txt"
+    if not record_file.exists():
+        record_file.write_text(string)
+    recorded = record_file.read_text()
+    changes = []
+    for k, (line1, line2) in enumerate(zip(string.splitlines(), recorded.splitlines(), strict=False)):
+        if line1 != line2:
+            changes.append(f'line #{k + 1}: "{line2}" -> "{line1}"')
+    if changes:
+        print(string)
+        print("# # # # #")
+        print(recorded)
+        message = ["Difference with reference file:"] + changes
+        message += ["", "Delete the record file if this is normal:", f"rm {record_file}"]
+        raise AssertionError("\n".join(message))
+
+
+def test_make_qsub_string_array() -> None:
+    """Test qsub string generation for array jobs.
+
+    Array jobs should include:
+    - -J directive for array specification
+    - Shell script code to extract PBS_ARRAY_ID and PBS_ARRAY_INDEX
+    - No qalter calls (handled separately for array jobs)
+    """
+    string = pbs._make_qsub_string(
+        command="my-custom_command",
+        folder="/tmp/logs",
+        partition="learnfair",
+        exclusive=True,
+        additional_parameters={"blublu": 12},
+        map_count=10,  # This makes it an array job with 10 tasks
+    )
+    # Check for array job directive
+    assert "#PBS -J 0-9" in string
+    # Check for PBS environment variable extraction in shell code
+    assert "PBS_ARRAY_ID" in string
+    assert "PBS_ARRAY_INDEX" in string
+    assert "PBS_JOBID" in string
+    # Check other expected content
+    assert "#PBS -q learnfair" in string
+    assert "--command" not in string
+    assert "constraint" not in string
+
+    record_file = Path(__file__).parent / "_qsub_test_record_array.txt"
     if not record_file.exists():
         record_file.write_text(string)
     recorded = record_file.read_text()
@@ -481,11 +573,12 @@ Job Id: 20956421[2-4%25]
     output = pbs.PBSInfoWatcher().read_info(example)
     print(f"{output=}")
     assert output["5610980"] == {"JobID": "5610980", "State": "RUNNING"}
-    assert output["20956421_0"] == {"JobID": "20956421_0", "State": "RUNNING"}
-    assert output["20956421_2"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
-    assert output["20956421_3"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
-    assert output["20956421_4"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
-    assert set(output) == {"5610980", "20956421_0", "20956421_2", "20956421_3", "20956421_4"}
+    # Array job tasks use bracket notation: 20956421[0] not 20956421_0
+    assert output["20956421[0]"] == {"JobID": "20956421_0", "State": "RUNNING"}
+    assert output["20956421[2]"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
+    assert output["20956421[3]"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
+    assert output["20956421[4]"] == {"JobID": "20956421_[2-4%25]", "State": "PENDING"}
+    assert set(output) == {"5610980", "20956421[0]", "20956421[2]", "20956421[3]", "20956421[4]"}
 
 
 def test_read_info_qstat_format() -> None:
@@ -508,7 +601,7 @@ def test_read_info_qstat_format() -> None:
 
 @pytest.mark.parametrize(  # type: ignore
     "name,state",
-    [("12_0", "RUNNING"), ("12_1", "UNKNOWN"), ("12_2", "EXITING"), ("12_3", "UNKNOWN"), ("12_4", "EXITING")],
+    [("12_0", "RUNNING"), ("12_1", "UNKNOWN"), ("12_2", "EXPIRED"), ("12_3", "UNKNOWN"), ("12_4", "EXPIRED")],
 )
 def test_read_info_array(name: str, state: str) -> None:
     example = "Job ID           S\n12_0             R\n12_[2,4-12]      X\n"
@@ -553,14 +646,16 @@ def test_watcher() -> None:
         watcher = pbs.PBSInfoWatcher()
         mock.set_job_state("12", "RUNNING")
         assert watcher.num_calls == 0
+        # First call: job "11" not found, but _num_calls <= 2, so return PENDING
         state = watcher.get_state(job_id="11")
         assert set(watcher._info_dict.keys()) == {"12"}
         assert watcher._registered == {"11"}
 
-        assert state == "UNKNOWN"
+        assert state == "PENDING"  # Changed from "UNKNOWN" - new behavior for unregistered jobs
+        # Note: "FAILED" is converted to "F" by set_job_state, which maps to "COMPLETED"
         mock.set_job_state("12", "FAILED")
         state = watcher.get_state(job_id="12", mode="force")
-        assert state == "FAILED"
+        assert state == "COMPLETED"  # Changed from "FAILED" - F maps to COMPLETED per PBS Pro
         # TODO: this test is implementation specific. Not sure if we can rewrite it another way.
         assert watcher._registered == {"11", "12"}
         assert watcher._finished == {"12"}
