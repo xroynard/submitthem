@@ -60,7 +60,7 @@ class JobPaths:
     def submission_file(self) -> Path:
         if self.job_id and ("_" in self.job_id or "[" in self.job_id):
             # We only have one submission file per job array
-            # PBS uses "1234[0]" format, SLURM uses "1234_0" format
+            # PBS uses "3141592653589793[0]" format, SLURM uses "3141592653589793_0" format
             return self._format_id(self.folder / "%A_submission.sh")
         return self._format_id(self.folder / "%j_submission.sh")
 
@@ -70,7 +70,7 @@ class JobPaths:
 
     @property
     def result_pickle(self) -> Path:
-        # For array jobs, the index is already encoded in job_id (e.g., "1234[0]" -> "1234_0")
+        # For array jobs, the index is already encoded in job_id (e.g., "3141592653589793[0]" -> "3141592653589793_0")
         # So we don't need to add %t separately
         # For non-array jobs, task_id is used to distinguish multiple tasks
         if self.job_id and ("_" in self.job_id or "[" in self.job_id):
@@ -105,25 +105,25 @@ class JobPaths:
     def _format_id(self, path: Path | str) -> Path:
         """Replace id tag by actual id if available.
 
-        Handles both underscore notation (SLURM: "1234_0") and bracket notation (PBS: "1234[0]").
+        Handles both underscore notation (SLURM: "3141592653589793_0") and bracket notation (PBS: "3141592653589793[0]").
         For filesystems, converts PBS bracket notation to underscore notation.
         """
         if self.job_id is None:
             return Path(path)
 
         # Extract array ID and index from job_id
-        # Handles both formats: "1234_0" (SLURM) and "1234[0]" (PBS)
+        # Handles both formats: "3141592653589793_0" (SLURM) and "3141592653589793[0]" (PBS)
         import re
 
         bracket_match = re.match(r"(\d+)\[(\d+)\]", str(self.job_id))
         if bracket_match:
-            # PBS bracket notation: "1234[0]"
+            # PBS bracket notation: "3141592653589793[0]"
             array_id = bracket_match.group(1)
             array_index = bracket_match.group(2)
             # For filesystem paths, use underscore notation
             filesystem_friendly_id = f"{array_id}_{array_index}"
         else:
-            # SLURM underscore notation: "1234_0"
+            # SLURM underscore notation: "3141592653589793_0"
             array_id, *array_index_list = str(self.job_id).split("_", 1)
             array_index = array_index_list[0] if array_index_list else None
             # Already filesystem friendly

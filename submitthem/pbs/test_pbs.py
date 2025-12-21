@@ -343,12 +343,12 @@ def test_make_qsub_string() -> None:
     string = pbs._make_qsub_string(
         command="my-custom_command",
         folder="/tmp",
-        partition="learnfair",
+        partition="compute_partition",
         exclusive=True,
         additional_parameters={"blublu": 12},
     )
     # PBS uses -q for queue name, not partition
-    assert "#PBS -q learnfair" in string
+    assert "#PBS -q compute_partition" in string
     assert "--command" not in string
     assert "constraint" not in string
     record_file = Path(__file__).parent / "_qsub_test_record.txt"
@@ -379,7 +379,7 @@ def test_make_qsub_string_array() -> None:
     string = pbs._make_qsub_string(
         command="my-custom_command",
         folder="/tmp/logs",
-        partition="learnfair",
+        partition="compute_partition",
         exclusive=True,
         additional_parameters={"blublu": 12},
         map_count=10,  # This makes it an array job with 10 tasks
@@ -391,7 +391,7 @@ def test_make_qsub_string_array() -> None:
     assert "PBS_ARRAY_INDEX" in string
     assert "PBS_JOBID" in string
     # Check other expected content
-    assert "#PBS -q learnfair" in string
+    assert "#PBS -q compute_partition" in string
     assert "--command" not in string
     assert "constraint" not in string
 
