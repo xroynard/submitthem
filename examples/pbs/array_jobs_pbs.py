@@ -101,18 +101,18 @@ def main():
 
         # Check if all jobs share the same main job ID (indicating an array)
         # Extract main numeric ID from various formats:
-        # - "1234[0].domain" -> "1234"
-        # - "1234[0]" -> "1234"
-        # - "1234_0" -> "1234"
+        # - "3141592653589793[0].domain" -> "3141592653589793"
+        # - "3141592653589793[0]" -> "3141592653589793"
+        # - "3141592653589793_0" -> "3141592653589793"
         def extract_main_id(job_id: str) -> str:
             """Extract the main numeric job ID from various PBS job ID formats."""
             # Strip domain suffix first
             id_no_domain = job_id.split(".")[0]
-            # Try bracket notation: "1234[0]" -> extract "1234"
+            # Try bracket notation: "3141592653589793[0]" -> extract "3141592653589793"
             bracket_match = re.match(r"(\d+)\[", id_no_domain)
             if bracket_match:
                 return bracket_match.group(1)
-            # Try underscore notation: "1234_0" -> extract "1234"
+            # Try underscore notation: "3141592653589793_0" -> extract "3141592653589793"
             return id_no_domain.split("_")[0]
 
         main_job_id = extract_main_id(jobs[0].job_id)

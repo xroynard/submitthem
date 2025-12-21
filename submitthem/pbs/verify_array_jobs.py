@@ -108,10 +108,13 @@ def test_job_id_parsing():
     """Verify that job IDs are correctly parsed for arrays."""
     # Test parsing of array job IDs
     test_cases = [
-        ("12345", [(("12345",))]),  # Single job
-        ("12345_0", [("12345", "0")]),  # Array job with single index
-        ("12345_[0-4]", [("12345", "0", "4")]),  # Array job with range
-        ("12345_[0,2,4]", [("12345", "0"), ("12345", "2"), ("12345", "4")]),  # Array with list
+        ("3141592653589793", [(("3141592653589793",))]),  # Single job
+        ("3141592653589793_0", [("3141592653589793", "0")]),  # Array job with single index
+        ("3141592653589793_[0-4]", [("3141592653589793", "0", "4")]),  # Array job with range
+        (
+            "3141592653589793_[0,2,4]",
+            [("3141592653589793", "0"), ("3141592653589793", "2"), ("3141592653589793", "4")],
+        ),  # Array with list
     ]
 
     for job_id, expected in test_cases:

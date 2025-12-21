@@ -70,14 +70,10 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
         self.job_count += 1
         qsub_file = Path(args[0])
         array = self._get_array_count(qsub_file)
-        self.set_job_state(job_id, "RUNNING", array)
+        self.set_job_state(job_id, "R", array)
         return f"Submitted batch job {job_id}\n"
 
     def qdel(self, _: tp.Sequence[str]) -> str:
-        return ""
-
-    def qalter(self, _: tp.Sequence[str]) -> str:
-        """Mock qalter command - always succeeds silently"""
         return ""
 
     def _get_array_count(self, submission_file: Path) -> int:
@@ -116,7 +112,7 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
 @contextlib.contextmanager
 def mocked_pbs() -> tp.Iterator[MockedPBSSubprocess]:
     # TODO: check if both are needed
-    mock = MockedPBSSubprocess(known_cmds=["qsub", "qsub -I", "qalter"])
+    mock = MockedPBSSubprocess(known_cmds=["qsub", "qsub -I"])
     try:
         with mock.context():
             yield mock
@@ -343,12 +339,12 @@ def test_make_qsub_string() -> None:
     string = pbs._make_qsub_string(
         command="my-custom_command",
         folder="/tmp",
-        partition="learnfair",
+        partition="compute_partition",
         exclusive=True,
         additional_parameters={"blublu": 12},
     )
     # PBS uses -q for queue name, not partition
-    assert "#PBS -q learnfair" in string
+    assert "#PBS -q compute_partition" in string
     assert "--command" not in string
     assert "constraint" not in string
     record_file = Path(__file__).parent / "_qsub_test_record.txt"
@@ -374,12 +370,11 @@ def test_make_qsub_string_array() -> None:
     Array jobs should include:
     - -J directive for array specification
     - Shell script code to extract PBS_ARRAY_ID and PBS_ARRAY_INDEX
-    - No qalter calls (handled separately for array jobs)
     """
     string = pbs._make_qsub_string(
         command="my-custom_command",
         folder="/tmp/logs",
-        partition="learnfair",
+        partition="compute_partition",
         exclusive=True,
         additional_parameters={"blublu": 12},
         map_count=10,  # This makes it an array job with 10 tasks
@@ -391,7 +386,7 @@ def test_make_qsub_string_array() -> None:
     assert "PBS_ARRAY_INDEX" in string
     assert "PBS_JOBID" in string
     # Check other expected content
-    assert "#PBS -q learnfair" in string
+    assert "#PBS -q compute_partition" in string
     assert "--command" not in string
     assert "constraint" not in string
 

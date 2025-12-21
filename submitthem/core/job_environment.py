@@ -125,7 +125,7 @@ class JobEnvironment:
 
     def __repr__(self) -> str:
         # should look like this:
-        # JobEnvironment(job_id=17015819, hostname=learnfair0218, local_rank=2(3), node=1(2), global_rank=5(6))
+        # JobEnvironment(job_id=3141592653589793, hostname=node001, local_rank=2(3), node=1(2), global_rank=5(6))
         info = [f"{n}={getattr(self, n)}" for n in ("job_id", "hostname")]
         names = ("local_rank", "node", "global_rank")
         totals = [self.num_tasks // self.num_nodes, self.num_nodes, self.num_tasks]

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Parameters
+#PBS -N submitthem
+#PBS -blublu 12
+#PBS -l place=excl
+#PBS -l select=1:ncpus=1
+#PBS -l walltime=00:05:00
+#PBS -q compute_partition
+
+# command
+export SUBMITTHEM_EXECUTOR=pbs
+
+# Extract and normalize job ID information from PBS environment variables
+# PBS_JOBID format varies: can be JOBID, JOBID[INDEX], JOBID.domain, or JOBID[INDEX].domain
+# We need to extract the numeric JOBID and INDEX for consistent file naming
+
+# Extract main numeric job ID from PBS_JOBID (remove domain suffix and brackets)
+MAIN_JOB_ID=$(echo "$PBS_JOBID" | sed 's/\([0-9]*\).*/\1/')
+
+# For array jobs, extract and set PBS_ARRAY_ID and PBS_ARRAY_INDEX if not already set
+# This handles PBS systems that don't automatically set these variables
+if [[ -z "$PBS_ARRAY_ID" && "$PBS_JOBID" == *'['* ]]; then
+  # Extract array ID and index from PBS_JOBID format like "3141592653589793[0]" or "3141592653589793[0].domain"
+  PBS_ARRAY_ID=$(echo "$PBS_JOBID" | sed 's/\([0-9]*\)\[\([0-9]*\)\].*/\1/')
+  PBS_ARRAY_INDEX=$(echo "$PBS_JOBID" | sed 's/\([0-9]*\)\[\([0-9]*\)\].*/\2/')
+  export PBS_ARRAY_ID PBS_ARRAY_INDEX
+fi
+
+# Set up output file redirection based on job type
+if [[ -n "$PBS_ARRAY_INDEX" ]]; then
+  # Array job: use per-task log file with underscore notation matching pickle files
+  OUTPUT_FILE="/tmp/${PBS_ARRAY_ID}_${PBS_ARRAY_INDEX}.log"
+else
+  # Non-array job: use main job ID with consistent underscore notation
+  OUTPUT_FILE="/tmp/${MAIN_JOB_ID}_log.log"
+fi
+
+# Create output directory and redirect all output to the log file
+# This replaces any default PBS output files with our consistently-named files
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+exec > "$OUTPUT_FILE" 2>&1
+
+# The input "command" is supposed to be a valid shell command
+set -e  # Exit on error
+my-custom_command

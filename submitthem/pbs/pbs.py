@@ -26,13 +26,13 @@ def read_job_id(job_id: str) -> list[tuple[str, ...]]:
     (main_id, [array_index, [final_array_index])
 
     Supports formats:
-    - Simple: "1234" -> [("1234",)]
-    - Array bracket notation: "1234[0]" -> [("1234", "0")]
-    - Array bracket range: "1234[1-2]" -> [("1234", "1", "2")]
-    - Old underscore notation: "1234_0" -> [("1234", "0")]
-    - Range notation with underscore: "1234_[1-2]" -> [("1234", "1", "2")]
+    - Simple: "3141592653589793" -> [("3141592653589793",)]
+    - Array bracket notation: "3141592653589793[0]" -> [("3141592653589793", "0")]
+    - Array bracket range: "3141592653589793[1-2]" -> [("3141592653589793", "1", "2")]
+    - Old underscore notation: "3141592653589793_0" -> [("3141592653589793", "0")]
+    - Range notation with underscore: "3141592653589793_[1-2]" -> [("3141592653589793", "1", "2")]
     """
-    # Try bracket range notation: "1234[1-2]" or "1234[2-4%25]"
+    # Try bracket range notation: "3141592653589793[1-2]" or "3141592653589793[2-4%25]"
     bracket_range_pattern = r"(?P<main_id>\d+)\[(?P<arrays>[0-9,\-]+)(\%\d+)?\](?:\.[^\s]+)?"
     match = re.search(bracket_range_pattern, job_id)
     if match is not None:
@@ -48,7 +48,7 @@ def read_job_id(job_id: str) -> list[tuple[str, ...]]:
                 result.append((main, array_range))
         return result
 
-    # Try simple bracket notation: "1234[0]" (single index, no range)
+    # Try simple bracket notation: "3141592653589793[0]" (single index, no range)
     bracket_pattern = r"(?P<main_id>\d+)\[(?P<index>\d+)\](?:\.[^\s]+)?"
     match = re.search(bracket_pattern, job_id)
     if match is not None:
@@ -56,7 +56,7 @@ def read_job_id(job_id: str) -> list[tuple[str, ...]]:
         index = match.group("index")
         return [(main, index)]
 
-    # Try range notation with underscore: "1234_[1-2]"
+    # Try range notation with underscore: "3141592653589793_[1-2]"
     range_pattern = r"(?P<main_id>\d+)_\[(?P<arrays>[0-9,\-]+)(\%\d+)?\]"
     match = re.search(range_pattern, job_id)
     if match is not None:
@@ -72,7 +72,7 @@ def read_job_id(job_id: str) -> list[tuple[str, ...]]:
                 result.append((main, array_range))
         return result
 
-    # Try simple underscore notation: "1234_0"
+    # Try simple underscore notation: "3141592653589793_0"
     main_id, *array_id = job_id.split("_", 1)
     if not array_id:
         return [(main_id,)]
@@ -87,14 +87,14 @@ class PBSInfoWatcher(core.InfoWatcher):
     def _make_command(self) -> list[str] | None:
         """Build qstat command to check job status.
 
-        For PBS array jobs, we query individual subjobs (e.g., "1234[0]", "1234[1]")
-        to get their actual status, rather than querying the whole array with "1234[]".
+        For PBS array jobs, we query individual subjobs (e.g., "3141592653589793[0]", "3141592653589793[1]")
+        to get their actual status, rather than querying the whole array with "3141592653589793[]".
         This gives us the true status of each task.
 
         This method deduplicates job IDs to avoid redundant queries:
-        - If we have "1234[0]" and "1234[1]", we query both separately
-        - If we have both "1234" (non-array) and "1234[0]" (array), we only query the array task
-          since "1234" alone typically doesn't represent a separate PBS job
+        - If we have "3141592653589793[0]" and "3141592653589793[1]", we query both separately
+        - If we have both "3141592653589793" (non-array) and "3141592653589793[0]" (array), we only query the array task
+          since "3141592653589793" alone typically doesn't represent a separate PBS job
         """
         to_check = set()
         base_ids = set()  # Track which base job IDs appear
@@ -103,7 +103,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             # Strip domain suffix first
             id_no_domain = job_id.split(".")[0]
 
-            # PBS uses bracket notation: "1234[0]"
+            # PBS uses bracket notation: "3141592653589793[0]"
             bracket_match = re.match(r"(\d+)\[", id_no_domain)
             if bracket_match:
                 # This is an array task - query it individually to get its specific status
@@ -137,8 +137,8 @@ class PBSInfoWatcher(core.InfoWatcher):
         - If we've done updates but no pickle and not in qstat → UNKNOWN
         - If we haven't updated yet → PENDING
 
-        Note: PBS job_ids may have domain suffix (e.g., "6122024.<domain>")
-        but qstat returns only the main job_id (e.g., "6122024"), so we strip the
+        Note: PBS job_ids may have domain suffix (e.g., "3141592653589793.<domain>")
+        but qstat returns only the main job_id (e.g., "3141592653589793"), so we strip the
         domain suffix for _info_dict lookup.
         """
         # Register the job if not already registered
@@ -156,7 +156,7 @@ class PBSInfoWatcher(core.InfoWatcher):
         if state:
             return state
 
-        # For array task IDs like "1234[0]", also try looking up just the base ID "1234"
+        # For array task IDs like "3141592653589793[0]", also try looking up just the base ID "3141592653589793"
         # in case qstat returns the whole array job status
         bracket_match = re.match(r"(\d+)\[", id_no_domain)
         if bracket_match:
@@ -249,7 +249,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             if not block:
                 continue
 
-            # Extract job id from the first line: "Job Id: 6122024.server" or "Job Id: 6122024[1].server"
+            # Extract job id from the first line: "Job Id: 3141592653589793.server" or "Job Id: 3141592653589793[1].server"
             first = block[0]
             m = re.match(r"^Job Id:\s*(\S+)", first)
             if not m:
@@ -257,7 +257,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             raw_jobid = m.group(1)
             # Strip server suffix after dot
             raw_jobid = raw_jobid.split(".", 1)[0]
-            # Normalize bracketed array form "6122024[1-3]" -> "12345_[1-3]"
+            # Normalize bracketed array form "3141592653589793[1-3]" -> "31415926535897935_[1-3]"
             # Only add underscore if not already present
             normalized_jobid = (
                 raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
@@ -432,7 +432,7 @@ class PBSInfoWatcher(core.InfoWatcher):
             state_val = state_map.get(state_letter, state_letter)
 
             # Parse the job ID to get main job and array indices
-            # read_job_id handles bracket "1234[0]", bracket range "1234[2-4]", and underscore "1234_0" formats
+            # read_job_id handles bracket "3141592653589793[0]", bracket range "3141592653589793[2-4]", and underscore "3141592653589793_0" formats
             try:
                 multi = read_job_id(raw_jobid)
             except Exception as e:
@@ -444,7 +444,7 @@ class PBSInfoWatcher(core.InfoWatcher):
                 continue
 
             # Normalize JobID in output: convert bracket notation to underscore for consistency
-            # "1234[0]" -> "1234_0", "1234[2-4]" -> "1234_[2-4]"
+            # "3141592653589793[0]" -> "3141592653589793_0", "3141592653589793[2-4]" -> "3141592653589793_[2-4]"
             output_jobid = (
                 raw_jobid.replace("[", "_[") if "[" in raw_jobid and "_[" not in raw_jobid else raw_jobid
             )
@@ -511,9 +511,9 @@ class PBSJob(core.Job[core.R]):
         """Override paths to handle PBS domain suffixes and array index notation.
 
         PBS job IDs may have:
-        - Domain suffix (e.g., "1160609.domain")
-        - Array index notation (e.g., "1160609[0]" for array task 0)
-        - Both (e.g., "1160609[0].domain")
+        - Domain suffix (e.g., "3141592653589793.domain")
+        - Array index notation (e.g., "3141592653589793[0]" for array task 0)
+        - Both (e.g., "3141592653589793[0].domain")
 
         For file paths, we keep the full job ID with bracket notation so that _format_id()
         can properly convert it to underscore notation for filesystem paths.
@@ -526,7 +526,7 @@ class PBSJob(core.Job[core.R]):
         # Use the base folder from the parent's internal _paths object
         base_folder = self._paths._folder
 
-        # Check for array index notation: "1160609[0]" -> array job
+        # Check for array index notation: "3141592653589793[0]" -> array job
         bracket_match = re.match(r"(\d+)\[(\d+)\]", full_id)
         if bracket_match:
             # Array job: keep full job ID with brackets for _format_id() to handle
@@ -662,10 +662,10 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
         for job IDs in submitthem, so this must match that format for pickle file paths.
 
         Handles multiple PBS_JOBID formats:
-        - "1234" (non-array)
-        - "1234[0]" (array with bracket notation)
-        - "1234[0].domain" (array with domain suffix)
-        - "1234[].domain[0]" (non-standard format from some PBS installations)
+        - "3141592653589793" (non-array)
+        - "3141592653589793[0]" (array with bracket notation)
+        - "3141592653589793[0].domain" (array with domain suffix)
+        - "3141592653589793[].domain[0]" (non-standard format from some PBS installations)
 
         Falls back to extracting array info from PBS_JOBID if PBS_ARRAY_ID is not usable.
         """
@@ -681,7 +681,7 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
         # Fallback: extract array notation from raw PBS_JOBID
         raw = os.environ[self._env["job_id"]]
 
-        # Try to match patterns like "1234[0].domain" or "1234[].domain[0]"
+        # Try to match patterns like "3141592653589793[0].domain" or "3141592653589793[].domain[0]"
         # Look for the last occurrence of [digits] in the string
         bracket_index_matches = list(re.finditer(r"\[(\d+)\]", raw))
         if bracket_index_matches:
@@ -697,20 +697,20 @@ class PBSJobEnvironment(job_environment.JobEnvironment):
     def raw_job_id(self) -> str:
         """Override to strip PBS domain suffix and array notation from job_id.
 
-        PBS may store the full job ID with domain suffix in $PBS_JOBID (e.g., "6122024.<domain>"),
-        or with array notation (e.g., "6122024[].domain[0]"), but we need just the main job ID
-        (e.g., "6122024") to match the pickle files created during submission.
+        PBS may store the full job ID with domain suffix in $PBS_JOBID (e.g., "3141592653589793.<domain>"),
+        or with array notation (e.g., "3141592653589793[].domain[0]"), but we need just the main job ID
+        (e.g., "3141592653589793") to match the pickle files created during submission.
 
         The array index is extracted separately via PBS_ARRAY_INDEX, not from PBS_JOBID.
         """
         job_id = os.environ[self._env["job_id"]]
         # Remove array notation like [0] or [] and domain suffixes
         # Examples:
-        #   "6122024" -> "6122024"
-        #   "6122024.domain" -> "6122024"
-        #   "6122024[0]" -> "6122024"
-        #   "6122024[0].domain" -> "6122024"
-        #   "6122024[].domain[0]" -> "6122024"
+        #   "3141592653589793" -> "3141592653589793"
+        #   "3141592653589793.domain" -> "3141592653589793"
+        #   "3141592653589793[0]" -> "3141592653589793"
+        #   "3141592653589793[0].domain" -> "3141592653589793"
+        #   "3141592653589793[].domain[0]" -> "3141592653589793"
 
         # Remove everything after and including [ or .
         # We want just the numeric job ID
@@ -999,11 +999,7 @@ class PBSExecutor(core.PicklingExecutor):
     def _submit_command(self, command: str) -> core.Job[tp.Any]:
         """Submit job via qsub.
 
-        For single jobs, use qalter to set output files to specific paths.
-
-        For array jobs, use qalter to set output directory to the job folder.
-        The job script extracts PBS environment variables (PBS_JOBID, PBS_ARRAY_ID, PBS_ARRAY_INDEX)
-        to compute per-task output paths within this directory.
+        Output/file redirection is handled inside the job script generated by _make_qsub_string.
         """
         tmp_uuid = uuid.uuid4().hex
         submission_file_path = (
@@ -1025,53 +1021,8 @@ class PBSExecutor(core.PicklingExecutor):
             except Exception:
                 pass  # Ignore errors if files don't exist
 
-        # Strip domain suffix from job ID (and remove empty brackets for array jobs)
-        main_job_id = job_id.split(".")[0].rstrip("[]")
-
-        is_array_job = self.parameters.get("map_count") is not None
-
-        if is_array_job:
-            # Array job: use qalter with array notation to set output directory
-            # Output files will be created in the job folder where pickle files are stored
-            # The job script will use PBS_ARRAY_ID and PBS_ARRAY_INDEX to create per-task files
-            output_dir = str(self.folder)
-            stdout_path = f"{output_dir}/{main_job_id}_log.out"
-            stderr_path = f"{output_dir}/{main_job_id}_log.err"
-
-            qalter_cmd = ["qalter", "-o", stdout_path]
-            if not self.parameters.get("stderr_to_stdout", False):
-                qalter_cmd.extend(["-e", stderr_path])
-            # Use array base notation for qalter
-            qalter_cmd.append(f"{main_job_id}[]")
-
-            try:
-                subprocess.check_call(qalter_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception as e:
-                logger.get_logger().warning(
-                    f"qalter failed to set output directory for array job {main_job_id}[]: {e}"
-                )
-        else:
-            # Single job: use qalter to set exact output file paths
-            paths = utils.JobPaths(folder=self.folder, job_id=main_job_id)
-            stdout_path = str(paths.stdout)
-            stderr_path = str(paths.stderr)
-
-            # Remove any log files that might have been created before qalter is called
-            for log_file in [Path(stdout_path), Path(stderr_path)]:
-                try:
-                    log_file.unlink(missing_ok=True)
-                except Exception:
-                    pass  # Ignore errors if files don't exist
-
-            qalter_cmd = ["qalter", "-o", stdout_path]
-            if not self.parameters.get("stderr_to_stdout", False):
-                qalter_cmd.extend(["-e", stderr_path])
-            qalter_cmd.append(main_job_id)
-
-            try:
-                subprocess.check_call(qalter_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception as e:
-                logger.get_logger().warning(f"qalter failed to set output files for job {main_job_id}: {e}")
+        # Output file redirection is handled via shell redirection in the job script,
+        # not via qsub directives, because PBS doesn't expand placeholders like %j, %t, %a
 
         tasks_ids = list(range(self._num_tasks()))
         job: core.Job[tp.Any] = self.job_class(folder=self.folder, job_id=job_id, tasks=tasks_ids)
@@ -1085,8 +1036,8 @@ class PBSExecutor(core.PicklingExecutor):
         """Returns the job ID from the output of qsub string"""
         if not isinstance(string, str):
             string = string.decode()
-        # PBS qsub outputs job ID directly, optionally with domain (e.g., "6122024.<domain>")
-        # For array jobs, PBS may output format like "6122024[].<domain>"
+        # PBS qsub outputs job ID directly, optionally with domain (e.g., "3141592653589793.<domain>")
+        # For array jobs, PBS may output format like "3141592653589793[].<domain>"
         # We need to extract just the main job ID without the empty brackets
         string = string.strip()
 
@@ -1308,12 +1259,18 @@ def _make_qsub_string(
         )
 
     # add necessary parameters
-    # For array jobs, set the J parameter
+    # For array jobs, set the J parameter and suppress PBS default output files
+    # (output is handled via shell redirection in the job script with consistent naming)
     if map_count is not None:
         assert isinstance(map_count, int) and map_count
         parameters["J"] = f"0-{map_count - 1}%{min(map_count, array_parallelism)}"
-    # Don't set output paths in qsub directives - PBS doesn't expand placeholders
-    # The job script will compute paths based on PBS environment variables
+        # Suppress PBS default output file creation for array jobs
+        # since we handle output redirection in the job script
+        parameters["o"] = "/dev/null"
+        parameters["e"] = "/dev/null"
+    # Note: We don't set output paths in qsub directives because:
+    # 1. PBS doesn't expand placeholders like %j, %t, %a, %A
+    # 2. The job script handles output redirection with consistent underscore notation
 
     #
     # now create the full content of submission file
@@ -1324,30 +1281,42 @@ def _make_qsub_string(
     if setup is not None:
         lines += ["", "# setup"] + setup
     # commandline (this will run the function and args specified in the file provided as argument)
-    # We pass -o and -e here, (TODO: check this statement for PBS: because the qsub
-    # command doesn't work as expected with a filename pattern)
+    # Output is handled via shell redirection because PBS doesn't expand placeholders like %j, %t, %a, %A
 
     lines += [
         "",
         "# command",
         "export SUBMITTHEM_EXECUTOR=pbs",
         "",
+        "# Extract and normalize job ID information from PBS environment variables",
+        "# PBS_JOBID format varies: can be JOBID, JOBID[INDEX], JOBID.domain, or JOBID[INDEX].domain",
+        "# We need to extract the numeric JOBID and INDEX for consistent file naming",
+        "",
+        "# Extract main numeric job ID from PBS_JOBID (remove domain suffix and brackets)",
+        "MAIN_JOB_ID=$(echo \"$PBS_JOBID\" | sed 's/\\([0-9]*\\).*/\\1/')",
+        "",
         "# For array jobs, extract and set PBS_ARRAY_ID and PBS_ARRAY_INDEX if not already set",
         "# This handles PBS systems that don't automatically set these variables",
         'if [[ -z "$PBS_ARRAY_ID" && "$PBS_JOBID" == *\'[\'* ]]; then',
-        '  # Extract array ID and index from PBS_JOBID format like "1234[0]"',
+        '  # Extract array ID and index from PBS_JOBID format like "3141592653589793[0]" or "3141592653589793[0].domain"',
         "  PBS_ARRAY_ID=$(echo \"$PBS_JOBID\" | sed 's/\\([0-9]*\\)\\[\\([0-9]*\\)\\].*/\\1/')",
         "  PBS_ARRAY_INDEX=$(echo \"$PBS_JOBID\" | sed 's/\\([0-9]*\\)\\[\\([0-9]*\\)\\].*/\\2/')",
         "  export PBS_ARRAY_ID PBS_ARRAY_INDEX",
         "fi",
         "",
-        "# For array jobs, redirect all output to per-task log file",
-        "# This ensures each array task has its own output log with task-specific content",
+        "# Set up output file redirection based on job type",
         'if [[ -n "$PBS_ARRAY_INDEX" ]]; then',
+        "  # Array job: use per-task log file with underscore notation matching pickle files",
         f'  OUTPUT_FILE="{folder}/${{PBS_ARRAY_ID}}_${{PBS_ARRAY_INDEX}}.log"',
-        '  mkdir -p "$(dirname "$OUTPUT_FILE")"',
-        '  exec > "$OUTPUT_FILE" 2>&1',
+        "else",
+        "  # Non-array job: use main job ID with consistent underscore notation",
+        f'  OUTPUT_FILE="{folder}/${{MAIN_JOB_ID}}_log.log"',
         "fi",
+        "",
+        "# Create output directory and redirect all output to the log file",
+        "# This replaces any default PBS output files with our consistently-named files",
+        'mkdir -p "$(dirname "$OUTPUT_FILE")"',
+        'exec > "$OUTPUT_FILE" 2>&1',
         "",
         '# The input "command" is supposed to be a valid shell command',
         "set -e  # Exit on error",
