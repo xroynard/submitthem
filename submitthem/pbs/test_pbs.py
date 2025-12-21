@@ -111,13 +111,15 @@ class MockedPBSSubprocess(test_core.MockedSubprocess):
 
 @contextlib.contextmanager
 def mocked_pbs() -> tp.Iterator[MockedPBSSubprocess]:
-    # TODO: check if both are needed
+    # Clear the shared watcher state at the beginning of each test
+    # This prevents pollution from parallel test execution
+    pbs.PBSJob.watcher.clear()
     mock = MockedPBSSubprocess(known_cmds=["qsub", "qsub -I"])
     try:
         with mock.context():
             yield mock
     finally:
-        # Clear the state of the shared watcher
+        # Clear the state of the shared watcher at the end of the test
         pbs.PBSJob.watcher.clear()
 
 
